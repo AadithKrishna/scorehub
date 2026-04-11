@@ -11,7 +11,7 @@ import MatchDetail from "./components/MatchDetail";
 import BottomNav from "./components/BottomNav";
 import { SPORTS, MOTORSPORT_IDS } from "./data/mockData";
 import { useGames } from "./hooks/useGames";
-import useUserStore from "./store/UserStore";
+import useUserStore from "./store/userStore";
 
 const ALL_TABS = [
   { id: "favourites", label: "Favourites", icon: "⭐" },
