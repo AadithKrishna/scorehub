@@ -107,11 +107,43 @@ async function fetchSport(sport) {
       events = data.data || [];
 
     } else if (sport === "f1") {
-      const res = await fetch(ENDPOINTS.f1);
-      if (!res.ok) throw new Error(`ESPN F1 error: ${res.status}`);
-      const data = await res.json();
-      events = data.events || [];
-    }
+  const res = await fetch(ENDPOINTS.f1);
+  if (!res.ok) throw new Error(`ESPN F1 error: ${res.status}`);
+  const data = await res.json();
+  events = data.events || [];
+
+} else if (sport === "motogp") {
+  // MotoGP public API — no key needed
+  try {
+    // Get current season
+    const seasonRes = await fetch(
+      "https://api.motogp.pulselive.com/motogp/v1/results/seasons"
+    );
+    const seasons = await seasonRes.json();
+    const currentSeason = seasons.find(s => s.current) || seasons[0];
+    if (!currentSeason) throw new Error("No MotoGP season found");
+
+    // Get events for current season
+    const eventsRes = await fetch(
+      `https://api.motogp.pulselive.com/motogp/v1/results/events?seasonUuid=${currentSeason.id}&isFinished=false`
+    );
+    const eventsData = await eventsRes.json();
+
+    // Also get finished events for recent results
+    const finishedRes = await fetch(
+      `https://api.motogp.pulselive.com/motogp/v1/results/events?seasonUuid=${currentSeason.id}&isFinished=true`
+    );
+    const finishedData = await finishedRes.json();
+
+    events = [
+      ...(Array.isArray(eventsData) ? eventsData : []),
+      ...(Array.isArray(finishedData) ? finishedData.slice(-3) : []),
+    ];
+  } catch (err) {
+    console.warn("MotoGP API failed:", err.message);
+    events = [];
+  }
+}
 
     const result = { events };
     setCached(sport, result);
@@ -286,6 +318,30 @@ function normalizeF1(events) {
   });
 }
 
+function normalizeMotoGP(events) {
+  return events.map((e) => {
+    const isFinished = e.status === "Finished" ||
+      new Date(e.date_end) < new Date();
+    const isUpcoming = new Date(e.date_start) > new Date();
+
+    return {
+      id: `motogp-${e.id}`,
+      type: "race",
+      status: isFinished ? "finished" : isUpcoming ? "scheduled" : "live",
+      minute: isFinished ? "FIN" :
+        isUpcoming ? new Date(e.date_start).toLocaleDateString("en-GB", {
+          day: "numeric", month: "short"
+        }) : "LIVE",
+      league: "MotoGP World Championship",
+      leagueLogo: "🏍️",
+      event: e.sponsored_name || e.name || "MotoGP Race",
+      circuit: e.circuit?.name || e.country?.name || "",
+      country: e.country?.iso?.toLowerCase() || "",
+      results: [],
+    };
+  });
+}
+
 // ─── Main export ──────────────────────────────────────────
 
 export async function getLiveGames(sport) {
@@ -295,5 +351,6 @@ export async function getLiveGames(sport) {
   if (sport === "soccer")  return normalizeSoccer(data.events);
   if (sport === "cricket") return normalizeCricket(data.events);
   if (sport === "f1")      return normalizeF1(data.events);
+  if (sport === "motogp")  return normalizeMotoGP(data.events);
   return [];
 }

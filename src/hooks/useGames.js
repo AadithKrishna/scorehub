@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getLiveGames } from "../services/espnApi";
 import { MOCK_GAMES } from "../data/mockData";
 
-const LIVE_SPORTS = ["soccer", "cricket", "f1"];
+const LIVE_SPORTS = ["soccer", "cricket", "f1", "motogp"];
 
 export function useGames(sport) {
   const isLive = LIVE_SPORTS.includes(sport);

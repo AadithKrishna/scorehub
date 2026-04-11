@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import Header from "./components/Header";
 import SportTabs from "./components/SportTabs";
 import MatchCard from "./components/MatchCard";
-import MotorsportCard from "./components/MotorsportCard";
+import RacingCard from "./components/RacingCard";
 import LeagueFilter from "./components/LeagueFilter";
 import LeagueGroup from "./components/LeagueGroup";
 import SearchModal from "./components/SearchModal";
@@ -149,7 +149,7 @@ export default function App() {
             ) : isMotorsport ? (
               <div className="px-4 space-y-3">
                 {filteredGames.map((game, i) => (
-                  <MotorsportCard key={game.id} race={game} />
+                  <RacingCard key={game.id} race={game} />
                 ))}
               </div>
             ) : activeLeague !== "all" ? (

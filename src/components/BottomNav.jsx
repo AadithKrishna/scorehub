@@ -1,22 +1,21 @@
 export default function BottomNav({ active, onSelect }) {
   const tabs = [
     { id: "favourites", icon: "⭐", label: "Favourites" },
-    { id: "soccer",     icon: "⚽", label: "Soccer"     },
-    { id: "cricket",    icon: "🏏", label: "Cricket"    },
-    { id: "f1",         icon: "🏎️", label: "F1"         },
-    { id: "more",       icon: "⚡", label: "More"       },
+    { id: "soccer",     icon: "⚽", label: "Football"  },
+    { id: "cricket",    icon: "🏏", label: "Cricket"   },
+    { id: "f1",         icon: "🏎️", label: "F1"        },
+    { id: "motogp",     icon: "🏍️", label: "MotoGP"   },
   ];
 
   return (
     <nav className="bottom-nav">
       <div className="flex items-center justify-around px-2 py-2 max-w-xl mx-auto">
         {tabs.map((tab) => {
-          const isActive = active === tab.id ||
-            (tab.id === "more" && !tabs.find(t => t.id === active));
+          const isActive = active === tab.id;
           return (
             <button
               key={tab.id}
-              onClick={() => onSelect(tab.id === "more" ? "basketball" : tab.id)}
+              onClick={() => onSelect(tab.id)}
               className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all duration-200"
             >
               <span className={`text-xl transition-all duration-200 ${

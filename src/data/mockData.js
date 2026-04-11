@@ -1,14 +1,8 @@
 export const SPORTS = [
-  { id: "soccer",     label: "Soccer",     icon: "⚽" },
-  { id: "basketball", label: "Basketball", icon: "🏀" },
-  { id: "nfl",        label: "NFL",        icon: "🏈" },
-  { id: "f1",         label: "F1",         icon: "🏎️" },
-  { id: "motogp",     label: "MotoGP",     icon: "🏍️" },
-  { id: "baseball",   label: "Baseball",   icon: "⚾" },
-  { id: "hockey",     label: "Hockey",     icon: "🏒" },
-  { id: "tennis",     label: "Tennis",     icon: "🎾" },
-  { id: "rugby",      label: "Rugby",      icon: "🏉" },
-  { id: "cricket",    label: "Cricket",    icon: "🏏" },
+  { id: "soccer",  label: "Football", icon: "⚽" },
+  { id: "cricket", label: "Cricket",  icon: "🏏" },
+  { id: "f1",      label: "F1",       icon: "🏎️" },
+  { id: "motogp",  label: "MotoGP",   icon: "🏍️" },
 ];
 
 export const MOTORSPORT_IDS = ["f1", "motogp"];
