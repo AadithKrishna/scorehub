@@ -9,6 +9,7 @@ import SearchModal from "./components/SearchModal";
 import FavouritesTab from "./components/FavouritesTab";
 import MatchDetail from "./components/MatchDetail";
 import BottomNav from "./components/BottomNav";
+import F1Page from "./components/F1Page";
 import { SPORTS, MOTORSPORT_IDS } from "./data/mockData";
 import { useGames } from "./hooks/useGames";
 import useUserStore from "./store/userStore";
@@ -35,6 +36,8 @@ export default function App() {
 
   const isFavouritesTab = activeSport === "favourites";
   const isMotorsport = MOTORSPORT_IDS.includes(activeSport);
+  const isF1 = activeSport === "f1";
+
   const { data: games = [], isLoading } = useGames(
     isFavouritesTab ? "soccer" : activeSport
   );
@@ -70,7 +73,7 @@ export default function App() {
     <div className="min-h-screen max-w-xl mx-auto">
       <Header onSearch={() => setShowSearch(true)} />
 
-      {/* Modals — rendered at top level so position:fixed works */}
+      {/* Modals */}
       {showSearch && (
         <SearchModal
           onClose={() => setShowSearch(false)}
@@ -102,17 +105,28 @@ export default function App() {
             onPress={setSelectedGame}
           />
         </div>
+
+      ) : isF1 ? (
+        /* F1 full page */
+        <F1Page />
+
       ) : (
         <>
-          {/* Status filter pills */}
+          {/* Status filter pills — not for motorsport or F1 */}
           {!isMotorsport && (
             <div className="flex gap-2 px-4 mb-3">
               {["all", "live", "finished", "scheduled"].map((f) => (
                 <button
                   key={f}
-                  onClick={() => { setFilter(f); setActiveLeague("all"); }}
+                  onClick={() => {
+                    setFilter(f);
+                    setActiveLeague("all");
+                  }}
                   className={`text-xs px-3 py-1.5 rounded-full font-medium capitalize transition-all
-                    ${filter === f ? "bg-violet-600 text-white" : "glass text-white/50 hover:text-white/70"}`}
+                    ${filter === f
+                      ? "bg-violet-600 text-white"
+                      : "glass text-white/50 hover:text-white/70"
+                    }`}
                 >
                   {f === "live" && liveCount > 0 ? `Live (${liveCount})` : f}
                 </button>
@@ -120,7 +134,7 @@ export default function App() {
             </div>
           )}
 
-          {/* League filter */}
+          {/* League filter — soccer and cricket only */}
           {(activeSport === "soccer" || activeSport === "cricket") && !isLoading && (
             <div className="mb-3">
               <LeagueFilter
@@ -136,20 +150,29 @@ export default function App() {
             {isLoading ? (
               <div className="px-4 space-y-3">
                 {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="glass rounded-2xl h-20 animate-pulse"
-                    style={{ animationDelay: `${i * 100}ms` }} />
+                  <div
+                    key={i}
+                    className="glass rounded-2xl h-20 animate-pulse"
+                    style={{ animationDelay: `${i * 100}ms` }}
+                  />
                 ))}
               </div>
             ) : filteredGames.length === 0 ? (
               <div className="text-center py-16 text-white/20">
                 <p className="text-5xl mb-4">🏟️</p>
                 <p className="text-sm font-medium">No events found</p>
-                <p className="text-xs mt-1 text-white/15">Try a different filter</p>
+                <p className="text-xs mt-1 text-white/15">
+                  Try a different filter or check back later
+                </p>
               </div>
             ) : isMotorsport ? (
               <div className="px-4 space-y-3">
                 {filteredGames.map((game, i) => (
-                  <RacingCard key={game.id} race={game} />
+                  <RacingCard
+                    key={game.id}
+                    race={game}
+                    onPress={setSelectedGame}
+                  />
                 ))}
               </div>
             ) : activeLeague !== "all" ? (
