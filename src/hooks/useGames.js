@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getLiveGames } from "../services/espnApi";
-import { MOCK_GAMES } from "../data/mockData";
+import { MOCK_GAMES, MOTOGP_CALENDAR } from "../data/mockData";
 
 const LIVE_SPORTS = ["soccer", "cricket", "f1", "motogp"];
 
@@ -10,15 +10,15 @@ export function useGames(sport) {
   return useQuery({
     queryKey: ["games", sport],
     queryFn: async () => {
-      if (!isLive) {
-        // Return mock data for sports not yet connected
-        return MOCK_GAMES[sport] || [];
-      }
+      if (!isLive) return MOCK_GAMES[sport] || [];
+
       try {
         const games = await getLiveGames(sport);
-        // Fall back to mock if ESPN returns nothing
+        // Fall back to mock calendar if real data fails
+        if (!games.length && sport === "motogp") return MOTOGP_CALENDAR;
         return games.length > 0 ? games : (MOCK_GAMES[sport] || []);
       } catch {
+        if (sport === "motogp") return MOTOGP_CALENDAR;
         return MOCK_GAMES[sport] || [];
       }
     },

@@ -113,12 +113,42 @@ async function fetchSport(sport) {
   events = data.events || [];
 
 } else if (sport === "motogp") {
-  // MotoGP public API — no key needed
   try {
+    // Use our Vercel proxy to avoid CORS
+    const base = import.meta.env.DEV
+      ? "http://localhost:3000/api/motogp"
+      : "/api/motogp";
+
     // Get current season
-    const seasonRes = await fetch(
-      "https://api.motogp.pulselive.com/motogp/v1/results/seasons"
+    const seasonRes = await fetch(`${base}?path=results/seasons`);
+    const seasons = await seasonRes.json();
+    const currentSeason = Array.isArray(seasons)
+      ? seasons.find(s => s.current) || seasons[0]
+      : null;
+
+    if (!currentSeason) throw new Error("No MotoGP season found");
+
+    // Get upcoming events
+    const upcomingRes = await fetch(
+      `${base}?path=results/events?seasonUuid=${currentSeason.id}&isFinished=false`
     );
+    const upcomingData = await upcomingRes.json();
+
+    // Get recent finished events
+    const finishedRes = await fetch(
+      `${base}?path=results/events?seasonUuid=${currentSeason.id}&isFinished=true`
+    );
+    const finishedData = await finishedRes.json();
+
+    events = [
+      ...(Array.isArray(finishedData) ? finishedData.slice(-3) : []),
+      ...(Array.isArray(upcomingData) ? upcomingData.slice(0, 3) : []),
+    ];
+  } catch (err) {
+    console.warn("MotoGP API failed:", err.message);
+    events = [];
+  }
+}
     const seasons = await seasonRes.json();
     const currentSeason = seasons.find(s => s.current) || seasons[0];
     if (!currentSeason) throw new Error("No MotoGP season found");
