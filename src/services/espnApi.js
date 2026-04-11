@@ -17,8 +17,6 @@ const ENDPOINTS = {
 
 const TTL = 60_000;
 
-// ─── Cache helpers ────────────────────────────────────────
-
 function getCached(sport) {
   try {
     const raw = localStorage.getItem(`scorehub_${sport}`);
@@ -69,8 +67,6 @@ function trackApiCall(sport) {
   } catch {}
 }
 
-// ─── Fetch ────────────────────────────────────────────────
-
 async function fetchSport(sport) {
   const cached = getCached(sport);
   if (cached) {
@@ -89,7 +85,9 @@ async function fetchSport(sport) {
         SOCCER_LEAGUES.map((league) =>
           fetch(`${ESPN}/soccer/${league}/scoreboard`)
             .then((r) => r.json())
-            .then((d) => (d.events || []).map((e) => ({ ...e, _leagueSlug: league })))
+            .then((d) =>
+              (d.events || []).map((e) => ({ ...e, _leagueSlug: league }))
+            )
         )
       );
       events = results
@@ -113,35 +111,29 @@ async function fetchSport(sport) {
       events = data.events || [];
 
     } else if (sport === "motogp") {
-      try {
-        const base = "/api/motogp";
+      const base = "/api/motogp";
+      const seasonRes = await fetch(`${base}?path=results/seasons`);
+      const seasons = await seasonRes.json();
+      const currentSeason = Array.isArray(seasons)
+        ? seasons.find((s) => s.current) || seasons[0]
+        : null;
 
-        const seasonRes = await fetch(`${base}?path=results/seasons`);
-        const seasons = await seasonRes.json();
-        const currentSeason = Array.isArray(seasons)
-          ? seasons.find(s => s.current) || seasons[0]
-          : null;
+      if (!currentSeason) throw new Error("No MotoGP season found");
 
-        if (!currentSeason) throw new Error("No MotoGP season found");
+      const upcomingRes = await fetch(
+        `${base}?path=results%2Fevents%3FseasonUuid%3D${currentSeason.id}%26isFinished%3Dfalse`
+      );
+      const upcomingData = await upcomingRes.json();
 
-        const upcomingRes = await fetch(
-          `${base}?path=results%2Fevents%3FseasonUuid%3D${currentSeason.id}%26isFinished%3Dfalse`
-        );
-        const upcomingData = await upcomingRes.json();
+      const finishedRes = await fetch(
+        `${base}?path=results%2Fevents%3FseasonUuid%3D${currentSeason.id}%26isFinished%3Dtrue`
+      );
+      const finishedData = await finishedRes.json();
 
-        const finishedRes = await fetch(
-          `${base}?path=results%2Fevents%3FseasonUuid%3D${currentSeason.id}%26isFinished%3Dtrue`
-        );
-        const finishedData = await finishedRes.json();
-
-        events = [
-          ...(Array.isArray(finishedData) ? finishedData.slice(-3) : []),
-          ...(Array.isArray(upcomingData) ? upcomingData.slice(0, 3) : []),
-        ];
-      } catch (err) {
-        console.warn("MotoGP API failed:", err.message);
-        events = [];
-      }
+      events = [
+        ...(Array.isArray(finishedData) ? finishedData.slice(-3) : []),
+        ...(Array.isArray(upcomingData) ? upcomingData.slice(0, 3) : []),
+      ];
     }
 
     const result = { events };
@@ -156,29 +148,15 @@ async function fetchSport(sport) {
   }
 }
 
-    const result = { events };
-    setCached(sport, result);
-    return result;
-
-  } catch (err) {
-    console.warn(`[ScoreHub] ${sport} fetch failed:`, err.message);
-    const stale = getStaleCached(sport);
-    if (stale) return stale;
-    return null;
-  }
-}
-
-// ─── League name + logo helpers ───────────────────────────
-
 function getLeagueName(slug) {
   const nameMap = {
-    "eng.1":              "Premier League",
-    "esp.1":              "La Liga",
-    "ger.1":              "Bundesliga",
-    "ita.1":              "Serie A",
-    "fra.1":              "Ligue 1",
-    "uefa.champions":     "Champions League",
-    "uefa.europa":        "Europa League",
+    "eng.1":                  "Premier League",
+    "esp.1":                  "La Liga",
+    "ger.1":                  "Bundesliga",
+    "ita.1":                  "Serie A",
+    "fra.1":                  "Ligue 1",
+    "uefa.champions":         "Champions League",
+    "uefa.europa":            "Europa League",
     "english-premier-league": "Premier League",
     "spanish-la-liga":        "La Liga",
     "german-bundesliga":      "Bundesliga",
@@ -186,6 +164,8 @@ function getLeagueName(slug) {
     "french-ligue-1":         "Ligue 1",
     "uefa-champions-league":  "Champions League",
     "uefa-europa-league":     "Europa League",
+    "champions":              "Champions League",
+    "europa":                 "Europa League",
   };
   if (nameMap[slug]) return nameMap[slug];
   for (const [key, val] of Object.entries(nameMap)) {
@@ -205,8 +185,6 @@ function getLeagueLogo(slug) {
   return "⚽";
 }
 
-// ─── Normalizers ──────────────────────────────────────────
-
 function getStatus(state) {
   if (state === "in")   return "live";
   if (state === "post") return "finished";
@@ -219,13 +197,13 @@ function normalizeSoccer(events) {
     const home  = comp?.competitors?.find((c) => c.homeAway === "home");
     const away  = comp?.competitors?.find((c) => c.homeAway === "away");
     const state = e.status?.type?.state;
-    const slug = e._leagueSlug || e.season?.slug || "";
+    const slug  = e._leagueSlug || e.season?.slug || "";
 
     return {
-      id: `espn-soccer-${e.id}`,
-      sport: "soccer",
-      status: getStatus(state),
-      minute: state === "in"
+      id:         `espn-soccer-${e.id}`,
+      sport:      "soccer",
+      status:     getStatus(state),
+      minute:     state === "in"
         ? `${e.status?.displayClock}'`
         : state === "post"
         ? "FT"
@@ -244,7 +222,7 @@ function normalizeSoccer(events) {
       },
       homeScore: state !== "pre" ? parseInt(home?.score) || 0 : null,
       awayScore: state !== "pre" ? parseInt(away?.score) || 0 : null,
-      events: [],
+      events:    [],
     };
   });
 }
@@ -261,24 +239,20 @@ function normalizeCricket(matches) {
       s.inning?.toLowerCase().includes(away?.toLowerCase().split(" ")[0])
     );
 
-    const formatScore = (s) => s ? `${s.r}/${s.w} (${s.o})` : null;
+    const formatScore = (s) => (s ? `${s.r}/${s.w} (${s.o})` : null);
 
     const leagueName =
       m.series?.name ||
       m.series?.t ||
-      (m.matchType === "t20"  ? "T20" :
-       m.matchType === "odi"  ? "ODI" :
+      (m.matchType === "t20"  ? "T20"        :
+       m.matchType === "odi"  ? "ODI"        :
        m.matchType === "test" ? "Test Match" :
        "Cricket");
 
     return {
-      id: `cricapi-${m.id}`,
-      sport: "cricket",
-      status: m.matchEnded
-        ? "finished"
-        : m.matchStarted
-        ? "live"
-        : "scheduled",
+      id:         `cricapi-${m.id}`,
+      sport:      "cricket",
+      status:     m.matchEnded ? "finished" : m.matchStarted ? "live" : "scheduled",
       minute:     m.status || "",
       league:     leagueName,
       leagueLogo: "🏏",
@@ -294,66 +268,91 @@ function normalizeCricket(matches) {
       },
       homeScore: formatScore(homeScoreObj),
       awayScore: formatScore(awayScoreObj),
-      events: [],
+      events:    [],
     };
   });
 }
 
 function normalizeF1(events) {
   return events.map((e) => {
-    const comp        = e.competitions?.[0];
-    const competitors = comp?.competitors || [];
-    const state       = e.status?.type?.state;
+    const competitions = e.competitions || [];
+    const state = e.status?.type?.state;
+
+    // Find the most relevant session (Race > Qualifying > FP3 > FP2 > FP1)
+    const priority = ["Race", "Qual", "FP3", "FP2", "FP1"];
+    const mainSession = competitions.sort((a, b) => {
+      const ai = priority.indexOf(a.type?.abbreviation);
+      const bi = priority.indexOf(b.type?.abbreviation);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    })[0];
+
+    const sessionStatus = mainSession?.status?.type?.state;
+    const sessionName   = mainSession?.type?.abbreviation || "";
+
+    // Build sessions list
+    const sessions = competitions.map((c) => ({
+      name:   c.type?.abbreviation || "",
+      status: c.status?.type?.state === "in"
+        ? "live"
+        : c.status?.type?.state === "post"
+        ? "finished"
+        : "scheduled",
+      time: c.date
+        ? new Date(c.date).toLocaleTimeString("en-GB", {
+            hour: "2-digit", minute: "2-digit"
+          })
+        : "",
+    }));
 
     return {
-      id:      `espn-f1-${e.id}`,
-      type:    "race",
-      status:  getStatus(state),
-      minute:  state === "in"
-        ? `Lap ${e.status?.displayClock || ""}`
+      id:         `espn-f1-${e.id}`,
+      type:       "race",
+      sport:      "f1",
+      status:     sessionStatus === "in"
+        ? "live"
+        : sessionStatus === "post"
+        ? "finished"
+        : getStatus(state),
+      minute:     sessionStatus === "in"
+        ? `${sessionName} LIVE`
         : e.status?.type?.shortDetail || "",
       league:     "Formula 1",
       leagueLogo: "🏎️",
-      event:   e.name || "F1 Race",
-      circuit: e.venue?.fullName || e.location || "",
-      results: competitors
-        .sort((a, b) => (parseInt(a.order) || 0) - (parseInt(b.order) || 0))
-        .slice(0, 5)
-        .map((c, i) => ({
-          pos:    parseInt(c.order) || i + 1,
-          driver: c.athlete?.displayName || `Driver ${i + 1}`,
-          team:   c.team?.displayName || "",
-          gap:    i === 0 ? "Leader" : c.status?.displayValue || "+--",
-        })),
+      event:      e.name || "F1 Race",
+      circuit:    e.circuit?.fullName || e.circuit?.name || "",
+      sessions,
+      results:    [],
     };
   });
 }
 
 function normalizeMotoGP(events) {
   return events.map((e) => {
-    const isFinished = e.status === "Finished" ||
-      new Date(e.date_end) < new Date();
-    const isUpcoming = new Date(e.date_start) > new Date();
+    const isFinished = !!e.date_end && new Date(e.date_end) < new Date();
+    const isUpcoming = !!e.date_start && new Date(e.date_start) > new Date();
 
     return {
-      id: `motogp-${e.id}`,
-      type: "race",
-      status: isFinished ? "finished" : isUpcoming ? "scheduled" : "live",
-      minute: isFinished ? "FIN" :
-        isUpcoming ? new Date(e.date_start).toLocaleDateString("en-GB", {
-          day: "numeric", month: "short"
-        }) : "LIVE",
-      league: "MotoGP World Championship",
+      id:         `motogp-${e.id}`,
+      type:       "race",
+      sport:      "motogp",
+      status:     isFinished ? "finished" : isUpcoming ? "scheduled" : "live",
+      minute:     isFinished
+        ? "FIN"
+        : isUpcoming
+        ? new Date(e.date_start).toLocaleDateString("en-GB", {
+            day: "numeric", month: "short",
+          })
+        : "LIVE",
+      league:     "MotoGP World Championship",
       leagueLogo: "🏍️",
-      event: e.sponsored_name || e.name || "MotoGP Race",
-      circuit: e.circuit?.name || e.country?.name || "",
-      country: e.country?.iso?.toLowerCase() || "",
-      results: [],
+      event:      e.sponsored_name || e.name || "MotoGP Race",
+      circuit:    e.circuit?.name || e.country?.name || "",
+      country:    e.country?.iso?.toLowerCase() || "",
+      sessions:   [],
+      results:    [],
     };
   });
 }
-
-// ─── Main export ──────────────────────────────────────────
 
 export async function getLiveGames(sport) {
   const data = await fetchSport(sport);
