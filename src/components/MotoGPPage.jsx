@@ -4,7 +4,11 @@ const SEASON_UUID = "e88b4e43-2209-47aa-8e83-0e0b1cedde6e";
 const CATEGORY_UUID = "e8c110ad-64aa-4e8e-8a86-f2f152f6a942";
 
 function mgp(path) {
-  return `/api/motogp?path=${encodeURIComponent(path)}`;
+  const [base, query] = path.split("?");
+  if (query) {
+    return `/api/motogp?path=${encodeURIComponent(base)}&${query}`;
+  }
+  return `/api/motogp?path=${encodeURIComponent(base)}`;
 }
 
 const CONSTRUCTOR_COLORS = {
@@ -400,7 +404,16 @@ function SessionResults({ sessionId }) {
 function RaceSchedule({ event, sessions }) {
   const now = new Date();
 
-  // If we have real session data use it, otherwise show basic schedule
+  const sessionNames = {
+    FP: "Free Practice", PR: "Pre-Race Warm Up",
+    Q: "Qualifying", SPR: "Sprint Race",
+    WUP: "Warm Up", RAC: "Race",
+  };
+  const sessionColors = {
+    RAC: "#ef4444", SPR: "#f97316",
+    Q: "#8b5cf6", PR: null, FP: null, WUP: null,
+  };
+
   if (sessions && sessions.length > 0) {
     return (
       <div className="space-y-2">
@@ -415,26 +428,13 @@ function RaceSchedule({ event, sessions }) {
           </span>
         </div>
         {sessions.map((s) => {
-          const sessionNames = {
-            FP: "Free Practice", PR: "Pre-Race Warm Up",
-            Q: "Qualifying", SPR: "Sprint Race",
-            WUP: "Warm Up", RAC: "Race",
-          };
-          const sessionIcons = {
-            FP: "🔧", PR: "🔧", Q: "⏱",
-            SPR: "⚡", WUP: "🌅", RAC: "🏁",
-          };
-          const sessionColors = {
-            RAC: "#ef4444", SPR: "#f97316",
-            Q: "#8b5cf6", PR: null, FP: null, WUP: null,
-          };
           const color = sessionColors[s.type];
           const bgColor = color ? `${color}22` : "rgba(255,255,255,0.05)";
           const borderColor = color ? `${color}44` : "rgba(255,255,255,0.08)";
           const textColor = color || "rgba(255,255,255,0.4)";
-
           const dt = new Date(s.date);
           const isPast = dt < now;
+          const daysAway = Math.ceil((dt - now) / (1000 * 60 * 60 * 24));
 
           return (
             <div key={s.id}
@@ -465,9 +465,7 @@ function RaceSchedule({ event, sessions }) {
                 </p>
                 {isPast
                   ? <span className="text-xs text-white/20">Done</span>
-                  : <span className="text-xs text-white/20">
-                      {Math.ceil((dt - now) / (1000 * 60 * 60 * 24))}d away
-                    </span>
+                  : <span className="text-xs text-white/20">{daysAway}d away</span>
                 }
               </div>
             </div>
@@ -480,7 +478,6 @@ function RaceSchedule({ event, sessions }) {
     );
   }
 
-  // Fallback when no session data
   return (
     <div className="text-center py-16">
       <p className="text-5xl mb-4">📅</p>
@@ -508,9 +505,6 @@ function RaceDetail({ event, onClose }) {
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 10);
-
-    // Always fetch sessions — for past races we show results,
-    // for upcoming races we show the schedule with real times
     fetch(mgp(`results/sessions?eventUuid=${event.id}&categoryUuid=${CATEGORY_UUID}`))
       .then(r => r.json())
       .then(d => {
@@ -545,7 +539,6 @@ function RaceDetail({ event, onClose }) {
     FP: "🔧", PR: "🔧", Q: "⏱", SPR: "⚡", WUP: "🌅", RAC: "🏁",
   }[type] || "🏍️");
 
-  // For finished races, only show sessions that have results
   const resultSessions = sessions.filter(s =>
     ["FP", "Q", "SPR", "WUP", "RAC"].includes(s.type) &&
     s.status === "FINISHED"

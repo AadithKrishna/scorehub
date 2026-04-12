@@ -1,16 +1,24 @@
 export default async function handler(req, res) {
-  // Extract raw query string and get everything after path=
   const rawUrl = req.url || "";
   const pathIndex = rawUrl.indexOf("path=");
-  
+
   if (pathIndex === -1) {
     return res.status(400).json({ error: "No path provided" });
   }
 
-  // Get everything after path= (this preserves & characters in the MotoGP path)
-  const path = decodeURIComponent(rawUrl.slice(pathIndex + 5));
+  // Get the path value (up to next & if any)
+  const afterPath = rawUrl.slice(pathIndex + 5);
+  const ampIndex = afterPath.indexOf("&");
+  const encodedBase = ampIndex === -1 ? afterPath : afterPath.slice(0, ampIndex);
+  const basePath = decodeURIComponent(encodedBase);
 
-  const url = `https://api.motogp.pulselive.com/motogp/v1/${path}`;
+  // Get any remaining query params after the path
+  const extraParams = ampIndex === -1 ? "" : afterPath.slice(ampIndex + 1);
+
+  // Build full URL
+  const url = extraParams
+    ? `https://api.motogp.pulselive.com/motogp/v1/${basePath}?${extraParams}`
+    : `https://api.motogp.pulselive.com/motogp/v1/${basePath}`;
 
   try {
     const response = await fetch(url, {
@@ -24,11 +32,9 @@ export default async function handler(req, res) {
     });
 
     const text = await response.text();
-
     res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=30");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Content-Type", "application/json");
-
     return res.status(response.status).send(text);
 
   } catch (err) {
