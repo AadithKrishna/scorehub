@@ -4,11 +4,8 @@ const SEASON_UUID = "e88b4e43-2209-47aa-8e83-0e0b1cedde6e";
 const CATEGORY_UUID = "e8c110ad-64aa-4e8e-8a86-f2f152f6a942";
 
 function mgp(path) {
-  const [base, query] = path.split("?");
-  if (query) {
-    return `/api/motogp?path=${encodeURIComponent(base)}&${query}`;
-  }
-  return `/api/motogp?path=${encodeURIComponent(base)}`;
+  // Encode the entire path including query params
+  return `/api/motogp?path=${encodeURIComponent(path)}`;
 }
 
 const CONSTRUCTOR_COLORS = {
@@ -164,7 +161,6 @@ function ConstructorStandings() {
         const color = getConstructorColor(s.name);
         const isTop3 = s.position <= 3;
         const pct = (s.points / maxPoints) * 100;
-
         return (
           <div
             key={s.name}
@@ -301,7 +297,8 @@ function SessionResults({ sessionId }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(mgp(`results/classifications?sessionUuid=${sessionId}`))
+    // Correct endpoint: results/session/{id}/classification
+    fetch(mgp(`results/session/${sessionId}/classification`))
       .then(r => r.json())
       .then(d => {
         setResults(d.classification || []);
@@ -505,6 +502,7 @@ function RaceDetail({ event, onClose }) {
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 10);
+    // Correct endpoint: results/sessions?eventUuid=...&categoryUuid=...
     fetch(mgp(`results/sessions?eventUuid=${event.id}&categoryUuid=${CATEGORY_UUID}`))
       .then(r => r.json())
       .then(d => {
