@@ -1,12 +1,14 @@
 export default async function handler(req, res) {
-  // Get the full URL and extract everything after ?path=
-  const fullUrl = req.url || "";
-  const pathMatch = fullUrl.match(/[?&]path=(.+?)(?:&|$)/);
-  const path = pathMatch ? decodeURIComponent(pathMatch[1]) : null;
-
-  if (!path) {
+  // Extract raw query string and get everything after path=
+  const rawUrl = req.url || "";
+  const pathIndex = rawUrl.indexOf("path=");
+  
+  if (pathIndex === -1) {
     return res.status(400).json({ error: "No path provided" });
   }
+
+  // Get everything after path= (this preserves & characters in the MotoGP path)
+  const path = decodeURIComponent(rawUrl.slice(pathIndex + 5));
 
   const url = `https://api.motogp.pulselive.com/motogp/v1/${path}`;
 

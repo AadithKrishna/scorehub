@@ -2,7 +2,10 @@ import { useState, useEffect } from "react";
 
 const SEASON_UUID = "e88b4e43-2209-47aa-8e83-0e0b1cedde6e";
 const CATEGORY_UUID = "e8c110ad-64aa-4e8e-8a86-f2f152f6a942";
-const BASE = "/api/motogp?path=";
+
+function mgp(path) {
+  return `/api/motogp?path=${encodeURIComponent(path)}`;
+}
 
 const CONSTRUCTOR_COLORS = {
   Aprilia: "#65c9b2",
@@ -24,7 +27,7 @@ function countryFlag(iso) {
     JP: "🇯🇵", DE: "🇩🇪", PT: "🇵🇹", TH: "🇹🇭", BR: "🇧🇷",
     ZA: "🇿🇦", TR: "🇹🇷", AR: "🇦🇷", US: "🇺🇸", SA: "🇸🇦",
     QA: "🇶🇦", MY: "🇲🇾", ID: "🇮🇩", AT: "🇦🇹", NL: "🇳🇱",
-    GB: "🇬🇧", CZ: "🇨🇿", SM: "🇸🇲", CA: "🇨🇦",
+    CZ: "🇨🇿", SM: "🇸🇲", CA: "🇨🇦",
   };
   return flags[iso] || "🏁";
 }
@@ -36,7 +39,7 @@ function RiderStandings() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${BASE}results/standings?seasonUuid=${SEASON_UUID}&categoryUuid=${CATEGORY_UUID}`)
+    fetch(mgp(`results/standings?seasonUuid=${SEASON_UUID}&categoryUuid=${CATEGORY_UUID}`))
       .then(r => r.json())
       .then(d => {
         setStandings(d.classification || []);
@@ -111,7 +114,7 @@ function ConstructorStandings() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${BASE}results/standings?seasonUuid=${SEASON_UUID}&categoryUuid=${CATEGORY_UUID}`)
+    fetch(mgp(`results/standings?seasonUuid=${SEASON_UUID}&categoryUuid=${CATEGORY_UUID}`))
       .then(r => r.json())
       .then(d => {
         const constructors = {};
@@ -202,8 +205,8 @@ function RaceCalendar({ onSelectRace }) {
 
   useEffect(() => {
     Promise.allSettled([
-      fetch(`${BASE}results/events?seasonUuid=${SEASON_UUID}&isFinished=true`).then(r => r.json()),
-      fetch(`${BASE}results/events?seasonUuid=${SEASON_UUID}&isFinished=false`).then(r => r.json()),
+      fetch(mgp(`results/events?seasonUuid=${SEASON_UUID}&isFinished=true`)).then(r => r.json()),
+      fetch(mgp(`results/events?seasonUuid=${SEASON_UUID}&isFinished=false`)).then(r => r.json()),
     ]).then(([finished, upcoming]) => {
       const finishedList = finished.status === "fulfilled" && Array.isArray(finished.value)
         ? finished.value : [];
@@ -233,8 +236,6 @@ function RaceCalendar({ onSelectRace }) {
       ))}
     </div>
   );
-
-  const now = new Date();
 
   return (
     <div className="px-4 space-y-2">
@@ -296,7 +297,7 @@ function SessionResults({ sessionId }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${BASE}results/classifications?sessionUuid=${sessionId}`)
+    fetch(mgp(`results/classifications?sessionUuid=${sessionId}`))
       .then(r => r.json())
       .then(d => {
         setResults(d.classification || []);
@@ -396,22 +397,14 @@ function SessionResults({ sessionId }) {
 
 // ── Race Weekend Schedule ──────────────────────────────
 
-function RaceSchedule({ event }) {
+function RaceSchedule({ event, sessions }) {
   const now = new Date();
 
-  const sessions = [
-    { name: "Free Practice 1", short: "FP1",  date: event.date_start, color: null      },
-    { name: "Free Practice 2", short: "FP2",  date: null,             color: null      },
-    { name: "Qualifying 1",    short: "Q1",   date: null,             color: "#8b5cf6" },
-    { name: "Qualifying 2",    short: "Q2",   date: null,             color: "#8b5cf6" },
-    { name: "Sprint Race",     short: "SPR",  date: null,             color: "#f97316" },
-    { name: "Race",            short: "RACE", date: event.date_end,   color: "#ef4444" },
-  ].filter(s => s.date);
-
-  return (
-    <div className="space-y-2">
-      <div className="glass-card rounded-xl px-4 py-3 mb-2">
-        <div className="flex items-center justify-between">
+  // If we have real session data use it, otherwise show basic schedule
+  if (sessions && sessions.length > 0) {
+    return (
+      <div className="space-y-2">
+        <div className="glass-card rounded-xl px-4 py-3 mb-2 flex items-center justify-between">
           <span className="text-xs text-white/40">Weekend dates</span>
           <span className="text-sm font-bold text-white">
             {new Date(event.date_start).toLocaleDateString(undefined, {
@@ -421,48 +414,83 @@ function RaceSchedule({ event }) {
             })}
           </span>
         </div>
+        {sessions.map((s) => {
+          const sessionNames = {
+            FP: "Free Practice", PR: "Pre-Race Warm Up",
+            Q: "Qualifying", SPR: "Sprint Race",
+            WUP: "Warm Up", RAC: "Race",
+          };
+          const sessionIcons = {
+            FP: "🔧", PR: "🔧", Q: "⏱",
+            SPR: "⚡", WUP: "🌅", RAC: "🏁",
+          };
+          const sessionColors = {
+            RAC: "#ef4444", SPR: "#f97316",
+            Q: "#8b5cf6", PR: null, FP: null, WUP: null,
+          };
+          const color = sessionColors[s.type];
+          const bgColor = color ? `${color}22` : "rgba(255,255,255,0.05)";
+          const borderColor = color ? `${color}44` : "rgba(255,255,255,0.08)";
+          const textColor = color || "rgba(255,255,255,0.4)";
+
+          const dt = new Date(s.date);
+          const isPast = dt < now;
+
+          return (
+            <div key={s.id}
+              className="glass-card rounded-xl px-4 py-3 flex items-center gap-3">
+              <div
+                className="w-12 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: bgColor, border: `1px solid ${borderColor}` }}
+              >
+                <span className="text-xs font-black" style={{ color: textColor }}>
+                  {s.type}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-semibold ${isPast ? "text-white/40" : "text-white"}`}>
+                  {sessionNames[s.type] || s.type}
+                </p>
+                <p className="text-xs text-white/35 mt-0.5">
+                  {dt.toLocaleDateString(undefined, {
+                    weekday: "short", day: "numeric", month: "short",
+                  })}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className={`text-sm font-bold ${isPast ? "text-white/30" : "text-white/70"}`}>
+                  {dt.toLocaleTimeString(undefined, {
+                    hour: "2-digit", minute: "2-digit",
+                  })}
+                </p>
+                {isPast
+                  ? <span className="text-xs text-white/20">Done</span>
+                  : <span className="text-xs text-white/20">
+                      {Math.ceil((dt - now) / (1000 * 60 * 60 * 24))}d away
+                    </span>
+                }
+              </div>
+            </div>
+          );
+        })}
+        <p className="text-center text-xs text-white/15 pt-2">
+          Times shown in your local timezone
+        </p>
       </div>
+    );
+  }
 
-      {sessions.map((s, i) => {
-        const dt = new Date(s.date);
-        const isPast = dt < now;
-        const bgColor = s.color ? `${s.color}22` : "rgba(255,255,255,0.05)";
-        const borderColor = s.color ? `${s.color}44` : "rgba(255,255,255,0.08)";
-        const textColor = s.color || "rgba(255,255,255,0.4)";
-
-        return (
-          <div key={s.short} className="glass-card rounded-xl px-4 py-3 flex items-center gap-3">
-            <div
-              className="w-12 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: bgColor, border: `1px solid ${borderColor}` }}
-            >
-              <span className="text-xs font-black" style={{ color: textColor }}>
-                {s.short}
-              </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className={`text-sm font-semibold ${isPast ? "text-white/40" : "text-white"}`}>
-                {s.name}
-              </p>
-              <p className="text-xs text-white/35 mt-0.5">
-                {dt.toLocaleDateString(undefined, {
-                  weekday: "short", day: "numeric", month: "short",
-                })}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className={`text-sm font-bold ${isPast ? "text-white/30" : "text-white/70"}`}>
-                {dt.toLocaleTimeString(undefined, {
-                  hour: "2-digit", minute: "2-digit",
-                })}
-              </p>
-              {isPast && <span className="text-xs text-white/20">Done</span>}
-            </div>
-          </div>
-        );
-      })}
-      <p className="text-center text-xs text-white/15 pt-2">
-        Times shown in your local timezone
+  // Fallback when no session data
+  return (
+    <div className="text-center py-16">
+      <p className="text-5xl mb-4">📅</p>
+      <p className="text-base font-bold text-white/50 mb-1">Race weekend upcoming</p>
+      <p className="text-sm text-white/25">
+        {new Date(event.date_start).toLocaleDateString(undefined, {
+          weekday: "long", day: "numeric", month: "long",
+        })} – {new Date(event.date_end).toLocaleDateString(undefined, {
+          day: "numeric", month: "long", year: "numeric",
+        })}
       </p>
     </div>
   );
@@ -477,32 +505,30 @@ function RaceDetail({ event, onClose }) {
   const [activeSession, setActiveSession] = useState(null);
 
   const isPast = event.status === "FINISHED";
-  const isUpcoming = !isPast;
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 10);
-    if (isPast) {
-      fetch(`${BASE}results/sessions?eventUuid=${event.id}&categoryUuid=${CATEGORY_UUID}`)
-        .then(r => r.json())
-        .then(d => {
-          const list = Array.isArray(d) ? d : [];
-          // Only show main sessions, sorted logically
-          const order = ["FP", "Q", "SPR", "WUP", "RAC"];
-          const sorted = list.sort((a, b) => {
-            const ai = order.indexOf(a.type);
-            const bi = order.indexOf(b.type);
-            return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-          });
-          setSessions(sorted);
-          // Default to Race
+
+    // Always fetch sessions — for past races we show results,
+    // for upcoming races we show the schedule with real times
+    fetch(mgp(`results/sessions?eventUuid=${event.id}&categoryUuid=${CATEGORY_UUID}`))
+      .then(r => r.json())
+      .then(d => {
+        const list = Array.isArray(d) ? d : [];
+        const order = ["FP", "PR", "Q", "SPR", "WUP", "RAC"];
+        const sorted = list.sort((a, b) => {
+          const ai = order.indexOf(a.type);
+          const bi = order.indexOf(b.type);
+          return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+        });
+        setSessions(sorted);
+        if (isPast) {
           const race = sorted.find(s => s.type === "RAC") || sorted[sorted.length - 1];
           if (race) setActiveSession(race);
-          setLoading(false);
-        })
-        .catch(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   function handleClose() {
@@ -511,13 +537,19 @@ function RaceDetail({ event, onClose }) {
   }
 
   const sessionName = (type) => ({
-    FP:  "Practice", PR: "Pre-Race", Q: "Qualifying",
-    SPR: "Sprint",   WUP: "Warm Up", RAC: "Race",
+    FP: "Practice", PR: "Pre-Race", Q: "Qualifying",
+    SPR: "Sprint", WUP: "Warm Up", RAC: "Race",
   }[type] || type);
 
   const sessionIcon = (type) => ({
     FP: "🔧", PR: "🔧", Q: "⏱", SPR: "⚡", WUP: "🌅", RAC: "🏁",
   }[type] || "🏍️");
+
+  // For finished races, only show sessions that have results
+  const resultSessions = sessions.filter(s =>
+    ["FP", "Q", "SPR", "WUP", "RAC"].includes(s.type) &&
+    s.status === "FINISHED"
+  );
 
   return (
     <div
@@ -556,10 +588,10 @@ function RaceDetail({ event, onClose }) {
         </button>
       </div>
 
-      {/* Session selector for finished races */}
-      {isPast && sessions.length > 0 && (
+      {/* Session tabs for finished races */}
+      {isPast && resultSessions.length > 0 && (
         <div className="flex gap-1.5 px-4 mb-3 overflow-x-auto no-scrollbar">
-          {sessions.map((s) => (
+          {resultSessions.map((s) => (
             <button
               key={s.id}
               onClick={() => setActiveSession(s)}
@@ -576,8 +608,8 @@ function RaceDetail({ event, onClose }) {
         </div>
       )}
 
-      {/* Upcoming label */}
-      {isUpcoming && (
+      {/* Schedule label for upcoming */}
+      {!isPast && (
         <div className="px-4 mb-3">
           <p className="text-xs text-white/30 font-semibold uppercase tracking-widest">
             📅 Race Weekend Schedule
@@ -593,8 +625,8 @@ function RaceDetail({ event, onClose }) {
               <div key={i} className="glass rounded-xl h-14 animate-pulse" />
             ))}
           </div>
-        ) : isUpcoming ? (
-          <RaceSchedule event={event} />
+        ) : !isPast ? (
+          <RaceSchedule event={event} sessions={sessions} />
         ) : activeSession ? (
           <SessionResults sessionId={activeSession.id} />
         ) : (
