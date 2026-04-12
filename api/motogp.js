@@ -1,5 +1,8 @@
 export default async function handler(req, res) {
-  const { path } = req.query;
+  // Get the full URL and extract everything after ?path=
+  const fullUrl = req.url || "";
+  const pathMatch = fullUrl.match(/[?&]path=(.+?)(?:&|$)/);
+  const path = pathMatch ? decodeURIComponent(pathMatch[1]) : null;
 
   if (!path) {
     return res.status(400).json({ error: "No path provided" });
