@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from "react";
 import Header from "./components/Header";
 import SportTabs from "./components/SportTabs";
 import MatchCard from "./components/MatchCard";
-import RacingCard from "./components/RacingCard";
 import LeagueFilter from "./components/LeagueFilter";
 import LeagueGroup from "./components/LeagueGroup";
 import SearchModal from "./components/SearchModal";
@@ -10,6 +9,7 @@ import FavouritesTab from "./components/FavouritesTab";
 import MatchDetail from "./components/MatchDetail";
 import BottomNav from "./components/BottomNav";
 import F1Page from "./components/F1Page";
+import MotoGPPage from "./components/MotoGPPage";
 import { SPORTS, MOTORSPORT_IDS } from "./data/mockData";
 import { useGames } from "./hooks/useGames";
 import useUserStore from "./store/userStore";
@@ -35,8 +35,9 @@ export default function App() {
   }, []);
 
   const isFavouritesTab = activeSport === "favourites";
-  const isMotorsport = MOTORSPORT_IDS.includes(activeSport);
   const isF1 = activeSport === "f1";
+  const isMotoGP = activeSport === "motogp";
+  const isMotorsport = MOTORSPORT_IDS.includes(activeSport);
 
   const { data: games = [], isLoading } = useGames(
     isFavouritesTab ? "soccer" : activeSport
@@ -97,8 +98,16 @@ export default function App() {
         />
       </div>
 
-      {/* Favourites tab */}
-      {isFavouritesTab ? (
+      {/* F1 full page */}
+      {isF1 ? (
+        <F1Page />
+
+      /* MotoGP full page */
+      ) : isMotoGP ? (
+        <MotoGPPage />
+
+      /* Favourites tab */
+      ) : isFavouritesTab ? (
         <div className="px-4 pb-8">
           <FavouritesTab
             allGames={games}
@@ -106,13 +115,10 @@ export default function App() {
           />
         </div>
 
-      ) : isF1 ? (
-        /* F1 full page */
-        <F1Page />
-
+      /* All other sports */
       ) : (
         <>
-          {/* Status filter pills — not for motorsport or F1 */}
+          {/* Status filter pills */}
           {!isMotorsport && (
             <div className="flex gap-2 px-4 mb-3">
               {["all", "live", "finished", "scheduled"].map((f) => (
@@ -134,7 +140,7 @@ export default function App() {
             </div>
           )}
 
-          {/* League filter — soccer and cricket only */}
+          {/* League filter */}
           {(activeSport === "soccer" || activeSport === "cricket") && !isLoading && (
             <div className="mb-3">
               <LeagueFilter
@@ -164,16 +170,6 @@ export default function App() {
                 <p className="text-xs mt-1 text-white/15">
                   Try a different filter or check back later
                 </p>
-              </div>
-            ) : isMotorsport ? (
-              <div className="px-4 space-y-3">
-                {filteredGames.map((game, i) => (
-                  <RacingCard
-                    key={game.id}
-                    race={game}
-                    onPress={setSelectedGame}
-                  />
-                ))}
               </div>
             ) : activeLeague !== "all" ? (
               <div className="px-4 space-y-2">
