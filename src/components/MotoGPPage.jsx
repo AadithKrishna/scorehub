@@ -4,7 +4,6 @@ const SEASON_UUID = "e88b4e43-2209-47aa-8e83-0e0b1cedde6e";
 const CATEGORY_UUID = "e8c110ad-64aa-4e8e-8a86-f2f152f6a942";
 
 function mgp(path) {
-  // Encode the entire path including query params
   return `/api/motogp?path=${encodeURIComponent(path)}`;
 }
 
@@ -31,6 +30,41 @@ function countryFlag(iso) {
     CZ: "🇨🇿", SM: "🇸🇲", CA: "🇨🇦",
   };
   return flags[iso] || "🏁";
+}
+
+// Give sessions numbered names when there are multiples of same type
+function labelSessions(sessions) {
+  const typeCount = {};
+  const typeIndex = {};
+  sessions.forEach(s => {
+    typeCount[s.type] = (typeCount[s.type] || 0) + 1;
+  });
+  return sessions.map(s => {
+    typeIndex[s.type] = (typeIndex[s.type] || 0) + 1;
+    const count = typeCount[s.type];
+    const idx = typeIndex[s.type];
+    const baseNames = {
+      FP:  "Free Practice",
+      PR:  "Pre-Race",
+      Q:   "Qualifying",
+      SPR: "Sprint",
+      WUP: "Warm Up",
+      RAC: "Race",
+    };
+    const shortNames = {
+      FP:  "FP",
+      PR:  "PR",
+      Q:   "Q",
+      SPR: "SPR",
+      WUP: "WUP",
+      RAC: "RAC",
+    };
+    return {
+      ...s,
+      displayName: count > 1 ? `${baseNames[s.type] || s.type} ${idx}` : (baseNames[s.type] || s.type),
+      shortName:   count > 1 ? `${shortNames[s.type] || s.type}${idx}` : (shortNames[s.type] || s.type),
+    };
+  });
 }
 
 // ── Rider Standings ────────────────────────────────────
@@ -297,7 +331,6 @@ function SessionResults({ sessionId }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Correct endpoint: results/session/{id}/classification
     fetch(mgp(`results/session/${sessionId}/classification`))
       .then(r => r.json())
       .then(d => {
@@ -401,17 +434,14 @@ function SessionResults({ sessionId }) {
 function RaceSchedule({ event, sessions }) {
   const now = new Date();
 
-  const sessionNames = {
-    FP: "Free Practice", PR: "Pre-Race Warm Up",
-    Q: "Qualifying", SPR: "Sprint Race",
-    WUP: "Warm Up", RAC: "Race",
-  };
   const sessionColors = {
     RAC: "#ef4444", SPR: "#f97316",
-    Q: "#8b5cf6", PR: null, FP: null, WUP: null,
+    Q:   "#8b5cf6", PR: null, FP: null, WUP: null,
   };
 
-  if (sessions && sessions.length > 0) {
+  const labeled = labelSessions(sessions);
+
+  if (labeled.length > 0) {
     return (
       <div className="space-y-2">
         <div className="glass-card rounded-xl px-4 py-3 mb-2 flex items-center justify-between">
@@ -424,7 +454,7 @@ function RaceSchedule({ event, sessions }) {
             })}
           </span>
         </div>
-        {sessions.map((s) => {
+        {labeled.map((s) => {
           const color = sessionColors[s.type];
           const bgColor = color ? `${color}22` : "rgba(255,255,255,0.05)";
           const borderColor = color ? `${color}44` : "rgba(255,255,255,0.08)";
@@ -437,16 +467,16 @@ function RaceSchedule({ event, sessions }) {
             <div key={s.id}
               className="glass-card rounded-xl px-4 py-3 flex items-center gap-3">
               <div
-                className="w-12 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                className="w-14 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
                 style={{ background: bgColor, border: `1px solid ${borderColor}` }}
               >
                 <span className="text-xs font-black" style={{ color: textColor }}>
-                  {s.type}
+                  {s.shortName}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
                 <p className={`text-sm font-semibold ${isPast ? "text-white/40" : "text-white"}`}>
-                  {sessionNames[s.type] || s.type}
+                  {s.displayName}
                 </p>
                 <p className="text-xs text-white/35 mt-0.5">
                   {dt.toLocaleDateString(undefined, {
@@ -462,7 +492,9 @@ function RaceSchedule({ event, sessions }) {
                 </p>
                 {isPast
                   ? <span className="text-xs text-white/20">Done</span>
-                  : <span className="text-xs text-white/20">{daysAway}d away</span>
+                  : <span className="text-xs text-white/20">
+                      {daysAway > 0 ? `${daysAway}d away` : "Today"}
+                    </span>
                 }
               </div>
             </div>
@@ -502,19 +534,17 @@ function RaceDetail({ event, onClose }) {
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 10);
-    // Correct endpoint: results/sessions?eventUuid=...&categoryUuid=...
     fetch(mgp(`results/sessions?eventUuid=${event.id}&categoryUuid=${CATEGORY_UUID}`))
       .then(r => r.json())
       .then(d => {
         const list = Array.isArray(d) ? d : [];
-        const order = ["FP", "PR", "Q", "SPR", "WUP", "RAC"];
-        const sorted = list.sort((a, b) => {
-          const ai = order.indexOf(a.type);
-          const bi = order.indexOf(b.type);
-          return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-        });
+
+        // Sort chronologically by date
+        const sorted = list.sort((a, b) => new Date(a.date) - new Date(b.date));
         setSessions(sorted);
+
         if (isPast) {
+          // Default to Race session
           const race = sorted.find(s => s.type === "RAC") || sorted[sorted.length - 1];
           if (race) setActiveSession(race);
         }
@@ -528,19 +558,26 @@ function RaceDetail({ event, onClose }) {
     setTimeout(onClose, 300);
   }
 
-  const sessionName = (type) => ({
-    FP: "Practice", PR: "Pre-Race", Q: "Qualifying",
-    SPR: "Sprint", WUP: "Warm Up", RAC: "Race",
-  }[type] || type);
-
   const sessionIcon = (type) => ({
     FP: "🔧", PR: "🔧", Q: "⏱", SPR: "⚡", WUP: "🌅", RAC: "🏁",
   }[type] || "🏍️");
 
+  // For finished races — show result sessions, Race first then others
   const resultSessions = sessions.filter(s =>
     ["FP", "Q", "SPR", "WUP", "RAC"].includes(s.type) &&
     s.status === "FINISHED"
   );
+
+  // Sort: RAC first, then SPR, then Q, then WUP, then FP
+  const resultOrder = ["RAC", "SPR", "Q", "WUP", "FP"];
+  const sortedResultSessions = [...resultSessions].sort((a, b) => {
+    const ai = resultOrder.indexOf(a.type);
+    const bi = resultOrder.indexOf(b.type);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+
+  // Label them with numbers
+  const labeledResultSessions = labelSessions(sortedResultSessions);
 
   return (
     <div
@@ -579,10 +616,10 @@ function RaceDetail({ event, onClose }) {
         </button>
       </div>
 
-      {/* Session tabs for finished races */}
-      {isPast && resultSessions.length > 0 && (
+      {/* Session tabs for finished races — Race first */}
+      {isPast && labeledResultSessions.length > 0 && (
         <div className="flex gap-1.5 px-4 mb-3 overflow-x-auto no-scrollbar">
-          {resultSessions.map((s) => (
+          {labeledResultSessions.map((s) => (
             <button
               key={s.id}
               onClick={() => setActiveSession(s)}
@@ -593,7 +630,7 @@ function RaceDetail({ event, onClose }) {
               }`}
             >
               <span>{sessionIcon(s.type)}</span>
-              {sessionName(s.type)}
+              {s.displayName}
             </button>
           ))}
         </div>
