@@ -23,6 +23,8 @@ function countryFlag(iso) {
     IT: "🇮🇹", ES: "🇪🇸", FR: "🇫🇷", GB: "🇬🇧", AU: "🇦🇺",
     JP: "🇯🇵", DE: "🇩🇪", PT: "🇵🇹", TH: "🇹🇭", BR: "🇧🇷",
     ZA: "🇿🇦", TR: "🇹🇷", AR: "🇦🇷", US: "🇺🇸", SA: "🇸🇦",
+    QA: "🇶🇦", MY: "🇲🇾", ID: "🇮🇩", AT: "🇦🇹", NL: "🇳🇱",
+    GB: "🇬🇧", CZ: "🇨🇿", SM: "🇸🇲", CA: "🇨🇦",
   };
   return flags[iso] || "🏁";
 }
@@ -51,6 +53,13 @@ function RiderStandings() {
     </div>
   );
 
+  if (!standings.length) return (
+    <div className="text-center py-16">
+      <p className="text-5xl mb-4">🏍️</p>
+      <p className="text-sm text-white/30">No standings available yet</p>
+    </div>
+  );
+
   return (
     <div className="px-4 space-y-2">
       {standings.map((s) => {
@@ -74,12 +83,12 @@ function RiderStandings() {
               <div className="flex items-center gap-2">
                 <span className="text-sm">{countryFlag(s.rider?.country?.iso)}</span>
                 <p className="text-sm font-bold text-white truncate">
-                  #{s.rider?.number}{" "}
+                  <span className="text-white/40 font-normal">#{s.rider?.number}</span>{" "}
                   <span style={{ color }}>{s.rider?.full_name}</span>
                 </p>
               </div>
               <p className="text-xs text-white/35 mt-0.5">
-                {s.team?.name} · {s.constructor?.name}
+                {s.team?.name} · <span style={{ color }}>{s.constructor?.name}</span>
               </p>
             </div>
             <div className="text-right flex-shrink-0">
@@ -105,16 +114,16 @@ function ConstructorStandings() {
     fetch(`${BASE}results/standings?seasonUuid=${SEASON_UUID}&categoryUuid=${CATEGORY_UUID}`)
       .then(r => r.json())
       .then(d => {
-        // Group by constructor
         const constructors = {};
         (d.classification || []).forEach(s => {
           const name = s.constructor?.name;
           if (!name) return;
           if (!constructors[name]) {
-            constructors[name] = { name, points: 0, wins: 0 };
+            constructors[name] = { name, points: 0, wins: 0, podiums: 0 };
           }
           constructors[name].points += s.points || 0;
           constructors[name].wins += s.race_wins || 0;
+          constructors[name].podiums += s.podiums || 0;
         });
         const sorted = Object.values(constructors)
           .sort((a, b) => b.points - a.points)
@@ -130,6 +139,13 @@ function ConstructorStandings() {
       {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className="glass rounded-2xl h-16 animate-pulse" />
       ))}
+    </div>
+  );
+
+  if (!standings.length) return (
+    <div className="text-center py-16">
+      <p className="text-5xl mb-4">🏭</p>
+      <p className="text-sm text-white/30">No standings available yet</p>
     </div>
   );
 
@@ -159,6 +175,9 @@ function ConstructorStandings() {
               </span>
               <div className="flex-1">
                 <p className="text-sm font-bold" style={{ color }}>{s.name}</p>
+                <p className="text-xs text-white/30 mt-0.5">
+                  {s.wins} win{s.wins !== 1 ? "s" : ""} · {s.podiums} podiums
+                </p>
               </div>
               <p className="text-base font-black text-white">{s.points} pts</p>
             </div>
@@ -191,14 +210,11 @@ function RaceCalendar({ onSelectRace }) {
       const upcomingList = upcoming.status === "fulfilled" && Array.isArray(upcoming.value)
         ? upcoming.value : [];
 
-      // Merge and deduplicate by id
       const seen = new Set();
       const all = [...finishedList, ...upcomingList]
         .filter(e => {
-          // Remove test events
           const name = (e.name || "").toUpperCase();
           if (name.includes("TEST")) return false;
-          // Deduplicate
           if (seen.has(e.id)) return false;
           seen.add(e.id);
           return true;
@@ -223,10 +239,8 @@ function RaceCalendar({ onSelectRace }) {
   return (
     <div className="px-4 space-y-2">
       {events.map((event, idx) => {
-        const endDate = new Date(event.date_end + "T23:59:59Z");
         const startDate = new Date(event.date_start);
         const isPast = event.status === "FINISHED";
-        const isUpcoming = event.status !== "FINISHED" && startDate > now;
         const prevPast = idx === 0 ? false : events[idx - 1].status === "FINISHED";
         const isNext = !isPast && prevPast;
 
@@ -252,20 +266,20 @@ function RaceCalendar({ onSelectRace }) {
               </div>
               <div className="text-right flex-shrink-0 ml-2">
                 {isPast ? (
-  <span className="text-xs text-white/25 bg-white/5 px-2 py-1 rounded-full">
-    Done
-  </span>
-) : isNext ? (
-  <span className="text-xs text-orange-400 bg-orange-500/15 px-2 py-1 rounded-full font-bold">
-    Next
-  </span>
-) : (
-  <span className="text-xs text-blue-400/70">
-    {startDate.toLocaleDateString(undefined, {
-      day: "numeric", month: "short",
-    })}
-  </span>
-)}
+                  <span className="text-xs text-white/25 bg-white/5 px-2 py-1 rounded-full">
+                    Done
+                  </span>
+                ) : isNext ? (
+                  <span className="text-xs text-orange-400 bg-orange-500/15 px-2 py-1 rounded-full font-bold">
+                    Next
+                  </span>
+                ) : (
+                  <span className="text-xs text-blue-400/70">
+                    {startDate.toLocaleDateString(undefined, {
+                      day: "numeric", month: "short",
+                    })}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -307,75 +321,149 @@ function SessionResults({ sessionId }) {
     </div>
   );
 
+  const finished = results.filter(r => r.position !== null);
+  const dnf = results.filter(r => r.position === null);
+
   return (
     <div className="space-y-2">
-      {results
-        .filter(r => r.position !== null)
-        .map((r, i) => {
-          const color = getConstructorColor(r.constructor?.name);
-          const isTop3 = r.position <= 3;
-          return (
-            <div
-              key={r.id}
-              className="glass-card rounded-xl px-4 py-2.5 flex items-center gap-3"
-              style={isTop3 ? { borderLeft: `3px solid ${color}` } : {}}
-            >
-              <span className={`text-sm font-black w-6 text-center tabular-nums ${
-                r.position === 1 ? "text-yellow-400" :
-                r.position === 2 ? "text-slate-300" :
-                r.position === 3 ? "text-amber-600" :
-                "text-white/30"
-              }`}>
-                {r.position === 1 ? "🥇" :
-                 r.position === 2 ? "🥈" :
-                 r.position === 3 ? "🥉" :
-                 r.position}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate">
-                  #{r.rider?.number} {r.rider?.full_name}
-                  <span className="ml-1">{countryFlag(r.rider?.country?.iso)}</span>
-                </p>
-                <p className="text-xs truncate" style={{ color, opacity: 0.8 }}>
-                  {r.team?.name}
-                </p>
-              </div>
-              <div className="text-right flex-shrink-0">
-                <p className="text-xs font-bold text-white/60 tabular-nums">
-                  {r.position === 1
-                    ? r.time
-                    : r.gap?.first
-                    ? `+${r.gap.first}`
-                    : r.time || "—"}
-                </p>
-                {r.points > 0 && (
-                  <p className="text-xs text-white/25">+{r.points}pts</p>
-                )}
-              </div>
+      {finished.map((r) => {
+        const color = getConstructorColor(r.constructor?.name);
+        const isTop3 = r.position <= 3;
+        return (
+          <div
+            key={r.id}
+            className="glass-card rounded-xl px-4 py-2.5 flex items-center gap-3"
+            style={isTop3 ? { borderLeft: `3px solid ${color}` } : {}}
+          >
+            <span className={`text-sm font-black w-6 text-center tabular-nums ${
+              r.position === 1 ? "text-yellow-400" :
+              r.position === 2 ? "text-slate-300" :
+              r.position === 3 ? "text-amber-600" :
+              "text-white/30"
+            }`}>
+              {r.position === 1 ? "🥇" :
+               r.position === 2 ? "🥈" :
+               r.position === 3 ? "🥉" :
+               r.position}
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white truncate">
+                <span className="text-white/35 text-xs">#{r.rider?.number}</span>{" "}
+                {r.rider?.full_name}
+                <span className="ml-1 text-xs">{countryFlag(r.rider?.country?.iso)}</span>
+              </p>
+              <p className="text-xs truncate" style={{ color, opacity: 0.8 }}>
+                {r.team?.name}
+              </p>
             </div>
-          );
-        })}
+            <div className="text-right flex-shrink-0">
+              <p className="text-xs font-bold text-white/60 tabular-nums">
+                {r.position === 1
+                  ? r.time
+                  : r.gap?.first
+                  ? `+${r.gap.first}`
+                  : r.time || "—"}
+              </p>
+              {r.points > 0 && (
+                <p className="text-xs text-white/25">+{r.points}pts</p>
+              )}
+            </div>
+          </div>
+        );
+      })}
 
-      {/* DNFs */}
-      {results.filter(r => r.position === null).length > 0 && (
+      {dnf.length > 0 && (
         <div className="pt-2">
           <div className="flex items-center gap-2 mb-2">
             <div className="h-px flex-1 bg-white/8" />
             <span className="text-xs text-white/20">DNF</span>
             <div className="h-px flex-1 bg-white/8" />
           </div>
-          {results.filter(r => r.position === null).map((r, i) => (
-            <div key={r.id} className="glass-card rounded-xl px-4 py-2 flex items-center gap-3 mb-1.5 opacity-40">
+          {dnf.map((r) => (
+            <div key={r.id}
+              className="glass-card rounded-xl px-4 py-2 flex items-center gap-3 mb-1.5 opacity-40">
               <span className="text-xs font-bold text-white/30 w-6 text-center">DNF</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate">
-                  #{r.rider?.number} {r.rider?.full_name}
-                </p>
-              </div>
+              <p className="text-sm font-semibold text-white truncate flex-1">
+                #{r.rider?.number} {r.rider?.full_name}
+              </p>
             </div>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Race Weekend Schedule ──────────────────────────────
+
+function RaceSchedule({ event }) {
+  const now = new Date();
+
+  const sessions = [
+    { name: "Free Practice 1", short: "FP1",  date: event.date_start, color: null      },
+    { name: "Free Practice 2", short: "FP2",  date: null,             color: null      },
+    { name: "Qualifying 1",    short: "Q1",   date: null,             color: "#8b5cf6" },
+    { name: "Qualifying 2",    short: "Q2",   date: null,             color: "#8b5cf6" },
+    { name: "Sprint Race",     short: "SPR",  date: null,             color: "#f97316" },
+    { name: "Race",            short: "RACE", date: event.date_end,   color: "#ef4444" },
+  ].filter(s => s.date);
+
+  return (
+    <div className="space-y-2">
+      <div className="glass-card rounded-xl px-4 py-3 mb-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-white/40">Weekend dates</span>
+          <span className="text-sm font-bold text-white">
+            {new Date(event.date_start).toLocaleDateString(undefined, {
+              day: "numeric", month: "short",
+            })} – {new Date(event.date_end).toLocaleDateString(undefined, {
+              day: "numeric", month: "short", year: "numeric",
+            })}
+          </span>
+        </div>
+      </div>
+
+      {sessions.map((s, i) => {
+        const dt = new Date(s.date);
+        const isPast = dt < now;
+        const bgColor = s.color ? `${s.color}22` : "rgba(255,255,255,0.05)";
+        const borderColor = s.color ? `${s.color}44` : "rgba(255,255,255,0.08)";
+        const textColor = s.color || "rgba(255,255,255,0.4)";
+
+        return (
+          <div key={s.short} className="glass-card rounded-xl px-4 py-3 flex items-center gap-3">
+            <div
+              className="w-12 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: bgColor, border: `1px solid ${borderColor}` }}
+            >
+              <span className="text-xs font-black" style={{ color: textColor }}>
+                {s.short}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-semibold ${isPast ? "text-white/40" : "text-white"}`}>
+                {s.name}
+              </p>
+              <p className="text-xs text-white/35 mt-0.5">
+                {dt.toLocaleDateString(undefined, {
+                  weekday: "short", day: "numeric", month: "short",
+                })}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className={`text-sm font-bold ${isPast ? "text-white/30" : "text-white/70"}`}>
+                {dt.toLocaleTimeString(undefined, {
+                  hour: "2-digit", minute: "2-digit",
+                })}
+              </p>
+              {isPast && <span className="text-xs text-white/20">Done</span>}
+            </div>
+          </div>
+        );
+      })}
+      <p className="text-center text-xs text-white/15 pt-2">
+        Times shown in your local timezone
+      </p>
     </div>
   );
 }
@@ -388,19 +476,26 @@ function RaceDetail({ event, onClose }) {
   const [loading, setLoading] = useState(true);
   const [activeSession, setActiveSession] = useState(null);
 
-  const isPast = new Date(event.date_end) < new Date();
-  const isUpcoming = new Date(event.date_start) > new Date();
+  const isPast = event.status === "FINISHED";
+  const isUpcoming = !isPast;
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 10);
-    if (isPast || !isUpcoming) {
+    if (isPast) {
       fetch(`${BASE}results/sessions?eventUuid=${event.id}&categoryUuid=${CATEGORY_UUID}`)
         .then(r => r.json())
         .then(d => {
           const list = Array.isArray(d) ? d : [];
-          setSessions(list);
-          // Default to Race session
-          const race = list.find(s => s.type === "RAC") || list[list.length - 1];
+          // Only show main sessions, sorted logically
+          const order = ["FP", "Q", "SPR", "WUP", "RAC"];
+          const sorted = list.sort((a, b) => {
+            const ai = order.indexOf(a.type);
+            const bi = order.indexOf(b.type);
+            return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+          });
+          setSessions(sorted);
+          // Default to Race
+          const race = sorted.find(s => s.type === "RAC") || sorted[sorted.length - 1];
           if (race) setActiveSession(race);
           setLoading(false);
         })
@@ -415,37 +510,14 @@ function RaceDetail({ event, onClose }) {
     setTimeout(onClose, 300);
   }
 
-  // Session display names
-  const sessionName = (type) => {
-    const names = {
-      FP:  "Practice",
-      PR:  "Pre-Race",
-      Q:   "Qualifying",
-      SPR: "Sprint",
-      WUP: "Warm Up",
-      RAC: "Race",
-    };
-    return names[type] || type;
-  };
+  const sessionName = (type) => ({
+    FP:  "Practice", PR: "Pre-Race", Q: "Qualifying",
+    SPR: "Sprint",   WUP: "Warm Up", RAC: "Race",
+  }[type] || type);
 
-  const sessionIcon = (type) => {
-    const icons = {
-      FP:  "🔧", PR: "🔧", Q: "⏱",
-      SPR: "⚡", WUP: "🌅", RAC: "🏁",
-    };
-    return icons[type] || "🏍️";
-  };
-
-  // Schedule for upcoming races
-  const scheduleItems = [
-    { label: "Practice 1",   date: event.date_start,  offset: 0   },
-    { label: "Practice 2",   date: event.date_start,  offset: 0.3 },
-    { label: "Qualifying 1", date: event.date_start,  offset: 1   },
-    { label: "Qualifying 2", date: event.date_start,  offset: 1.5 },
-    { label: "Sprint Race",  date: event.date_end,    offset: -1  },
-    { label: "Warm Up",      date: event.date_end,    offset: -0.3},
-    { label: "Race",         date: event.date_end,    offset: 0   },
-  ];
+  const sessionIcon = (type) => ({
+    FP: "🔧", PR: "🔧", Q: "⏱", SPR: "⚡", WUP: "🌅", RAC: "🏁",
+  }[type] || "🏍️");
 
   return (
     <div
@@ -484,22 +556,8 @@ function RaceDetail({ event, onClose }) {
         </button>
       </div>
 
-      {/* Date */}
-      <div className="px-4 mb-3">
-        <div className="glass-card rounded-xl px-4 py-2.5 flex items-center justify-between">
-          <span className="text-xs text-white/40">Race weekend</span>
-          <span className="text-sm font-bold text-white">
-            {new Date(event.date_start).toLocaleDateString(undefined, {
-              day: "numeric", month: "short",
-            })} – {new Date(event.date_end).toLocaleDateString(undefined, {
-              day: "numeric", month: "short", year: "numeric",
-            })}
-          </span>
-        </div>
-      </div>
-
-      {/* Session selector */}
-      {!isUpcoming && sessions.length > 0 && (
+      {/* Session selector for finished races */}
+      {isPast && sessions.length > 0 && (
         <div className="flex gap-1.5 px-4 mb-3 overflow-x-auto no-scrollbar">
           {sessions.map((s) => (
             <button
@@ -518,6 +576,15 @@ function RaceDetail({ event, onClose }) {
         </div>
       )}
 
+      {/* Upcoming label */}
+      {isUpcoming && (
+        <div className="px-4 mb-3">
+          <p className="text-xs text-white/30 font-semibold uppercase tracking-widest">
+            📅 Race Weekend Schedule
+          </p>
+        </div>
+      )}
+
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 pb-8">
         {loading ? (
@@ -527,17 +594,7 @@ function RaceDetail({ event, onClose }) {
             ))}
           </div>
         ) : isUpcoming ? (
-          <div className="text-center py-16">
-            <p className="text-5xl mb-4">🏍️</p>
-            <p className="text-base font-bold text-white/50 mb-1">
-              Race weekend upcoming
-            </p>
-            <p className="text-sm text-white/25">
-              {new Date(event.date_start).toLocaleDateString(undefined, {
-                weekday: "long", day: "numeric", month: "long",
-              })}
-            </p>
-          </div>
+          <RaceSchedule event={event} />
         ) : activeSession ? (
           <SessionResults sessionId={activeSession.id} />
         ) : (
