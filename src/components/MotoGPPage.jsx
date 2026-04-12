@@ -186,10 +186,25 @@ function RaceCalendar({ onSelectRace }) {
       fetch(`${BASE}results/events?seasonUuid=${SEASON_UUID}&isFinished=true`).then(r => r.json()),
       fetch(`${BASE}results/events?seasonUuid=${SEASON_UUID}&isFinished=false`).then(r => r.json()),
     ]).then(([finished, upcoming]) => {
-      const all = [
-        ...(finished.status === "fulfilled" && Array.isArray(finished.value) ? finished.value : []),
-        ...(upcoming.status === "fulfilled" && Array.isArray(upcoming.value) ? upcoming.value : []),
-      ].sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
+      const finishedList = finished.status === "fulfilled" && Array.isArray(finished.value)
+        ? finished.value : [];
+      const upcomingList = upcoming.status === "fulfilled" && Array.isArray(upcoming.value)
+        ? upcoming.value : [];
+
+      // Merge and deduplicate by id
+      const seen = new Set();
+      const all = [...finishedList, ...upcomingList]
+        .filter(e => {
+          // Remove test events
+          const name = (e.name || "").toUpperCase();
+          if (name.includes("TEST")) return false;
+          // Deduplicate
+          if (seen.has(e.id)) return false;
+          seen.add(e.id);
+          return true;
+        })
+        .sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
+
       setEvents(all);
       setLoading(false);
     });
@@ -208,10 +223,11 @@ function RaceCalendar({ onSelectRace }) {
   return (
     <div className="px-4 space-y-2">
       {events.map((event, idx) => {
-        const endDate = new Date(event.date_end);
+        const endDate = new Date(event.date_end + "T23:59:59Z");
         const startDate = new Date(event.date_start);
-        const isPast = endDate < now;
-        const prevPast = idx === 0 ? false : new Date(events[idx - 1].date_end) < now;
+        const isPast = event.status === "FINISHED";
+        const isUpcoming = event.status !== "FINISHED" && startDate > now;
+        const prevPast = idx === 0 ? false : events[idx - 1].status === "FINISHED";
         const isNext = !isPast && prevPast;
 
         return (
@@ -236,20 +252,20 @@ function RaceCalendar({ onSelectRace }) {
               </div>
               <div className="text-right flex-shrink-0 ml-2">
                 {isPast ? (
-                  <span className="text-xs text-white/25 bg-white/5 px-2 py-1 rounded-full">
-                    Done
-                  </span>
-                ) : isNext ? (
-                  <span className="text-xs text-orange-400 bg-orange-500/15 px-2 py-1 rounded-full font-bold">
-                    Next
-                  </span>
-                ) : (
-                  <span className="text-xs text-blue-400/70">
-                    {startDate.toLocaleDateString(undefined, {
-                      day: "numeric", month: "short",
-                    })}
-                  </span>
-                )}
+  <span className="text-xs text-white/25 bg-white/5 px-2 py-1 rounded-full">
+    Done
+  </span>
+) : isNext ? (
+  <span className="text-xs text-orange-400 bg-orange-500/15 px-2 py-1 rounded-full font-bold">
+    Next
+  </span>
+) : (
+  <span className="text-xs text-blue-400/70">
+    {startDate.toLocaleDateString(undefined, {
+      day: "numeric", month: "short",
+    })}
+  </span>
+)}
               </div>
             </div>
           </div>
