@@ -2,25 +2,23 @@ import { useState, useEffect } from "react";
 
 const JOLPICA = "https://api.jolpi.ca/ergast/f1";
 
-// Team colors
 const TEAM_COLORS = {
   mercedes:     "#00D2BE",
   ferrari:      "#DC0000",
-  "red_bull":   "#0600EF",
+  red_bull:     "#0600EF",
   mclaren:      "#FF8000",
   aston_martin: "#006F62",
   alpine:       "#0090FF",
   williams:     "#005AFF",
   haas:         "#B6BABD",
   sauber:       "#00E48F",
-  "rb":         "#1434CB",
+  rb:           "#1434CB",
 };
 
 function getTeamColor(constructorId) {
   return TEAM_COLORS[constructorId] || "#8b5cf6";
 }
 
-// ── Flag helper ───────────────────────────────────────
 function countryFlag(nationality) {
   const flags = {
     British: "🇬🇧", German: "🇩🇪", Spanish: "🇪🇸", Finnish: "🇫🇮",
@@ -32,7 +30,8 @@ function countryFlag(nationality) {
   return flags[nationality] || "🏁";
 }
 
-// ── Driver Standings ──────────────────────────────────
+// ── Driver Standings ───────────────────────────────────
+
 function DriverStandings() {
   const [standings, setStandings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,75 +40,9 @@ function DriverStandings() {
     fetch(`${JOLPICA}/2026/driverStandings.json`)
       .then(r => r.json())
       .then(d => {
-        const list = d.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings || [];
-        setStandings(list);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
-
-  if (loading) return (
-    <div className="space-y-3 px-4">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="glass rounded-2xl h-16 animate-pulse" />
-      ))}
-    </div>
-  );
-
-  return (
-    <div className="px-4 space-y-2">
-      {standings.map((s, i) => {
-        const color = getTeamColor(s.Constructors?.[0]?.constructorId);
-        const isTop3 = parseInt(s.position) <= 3;
-        return (
-          <div key={s.Driver.driverId}
-            className="glass-card rounded-2xl px-4 py-3 flex items-center gap-3"
-            style={isTop3 ? { borderLeft: `3px solid ${color}` } : {}}
-          >
-            {/* Position */}
-            <span className={`text-lg font-black w-6 text-center tabular-nums ${
-              s.position === "1" ? "text-yellow-400" :
-              s.position === "2" ? "text-slate-300" :
-              s.position === "3" ? "text-amber-600" :
-              "text-white/30"
-            }`}>
-              {s.position}
-            </span>
-
-            {/* Driver info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-sm">{countryFlag(s.Driver.nationality)}</span>
-                <p className="text-sm font-bold text-white truncate">
-                  {s.Driver.givenName} <span style={{ color }}>{s.Driver.familyName}</span>
-                </p>
-              </div>
-              <p className="text-xs text-white/35 mt-0.5">{s.Constructors?.[0]?.name}</p>
-            </div>
-
-            {/* Points + wins */}
-            <div className="text-right">
-              <p className="text-base font-black text-white">{s.points}</p>
-              <p className="text-xs text-white/30">{s.wins} win{s.wins !== "1" ? "s" : ""}</p>
-            </div>
-          </div>
+        setStandings(
+          d.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings || []
         );
-      })}
-    </div>
-  );
-}
-
-// ── Constructor Standings ─────────────────────────────
-function ConstructorStandings() {
-  const [standings, setStandings] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch(`${JOLPICA}/2026/constructorStandings.json`)
-      .then(r => r.json())
-      .then(d => {
-        const list = d.MRData?.StandingsTable?.StandingsLists?.[0]?.ConstructorStandings || [];
-        setStandings(list);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -117,7 +50,7 @@ function ConstructorStandings() {
 
   if (loading) return (
     <div className="space-y-3 px-4">
-      {Array.from({ length: 5 }).map((_, i) => (
+      {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="glass rounded-2xl h-16 animate-pulse" />
       ))}
     </div>
@@ -126,12 +59,85 @@ function ConstructorStandings() {
   return (
     <div className="px-4 space-y-2">
       {standings.map((s) => {
+        const color = getTeamColor(s.Constructors?.[0]?.constructorId);
+        const isTop3 = parseInt(s.position) <= 3;
+        return (
+          <div
+            key={s.Driver.driverId}
+            className="glass-card rounded-2xl px-4 py-3 flex items-center gap-3"
+            style={isTop3 ? { borderLeft: `3px solid ${color}` } : {}}
+          >
+            <span className={`text-lg font-black w-6 text-center tabular-nums ${
+              s.position === "1" ? "text-yellow-400" :
+              s.position === "2" ? "text-slate-300" :
+              s.position === "3" ? "text-amber-600" :
+              "text-white/30"
+            }`}>
+              {s.position}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">{countryFlag(s.Driver.nationality)}</span>
+                <p className="text-sm font-bold text-white truncate">
+                  {s.Driver.givenName}{" "}
+                  <span style={{ color }}>{s.Driver.familyName}</span>
+                </p>
+              </div>
+              <p className="text-xs text-white/35 mt-0.5">
+                {s.Constructors?.[0]?.name}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-base font-black text-white">{s.points}</p>
+              <p className="text-xs text-white/30">
+                {s.wins} win{s.wins !== "1" ? "s" : ""}
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Constructor Standings ──────────────────────────────
+
+function ConstructorStandings() {
+  const [standings, setStandings] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`${JOLPICA}/2026/constructorStandings.json`)
+      .then(r => r.json())
+      .then(d => {
+        setStandings(
+          d.MRData?.StandingsTable?.StandingsLists?.[0]?.ConstructorStandings || []
+        );
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  if (loading) return (
+    <div className="space-y-3 px-4">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="glass rounded-2xl h-16 animate-pulse" />
+      ))}
+    </div>
+  );
+
+  const maxPoints = parseInt(standings[0]?.points || 1);
+
+  return (
+    <div className="px-4 space-y-2">
+      {standings.map((s) => {
         const color = getTeamColor(s.Constructor.constructorId);
         const isTop3 = parseInt(s.position) <= 3;
-        const pct = (parseInt(s.points) / parseInt(standings[0]?.points || 1)) * 100;
+        const pct = (parseInt(s.points) / maxPoints) * 100;
 
         return (
-          <div key={s.Constructor.constructorId}
+          <div
+            key={s.Constructor.constructorId}
             className="glass-card rounded-2xl px-4 py-3"
             style={isTop3 ? { borderLeft: `3px solid ${color}` } : {}}
           >
@@ -151,10 +157,11 @@ function ConstructorStandings() {
               </div>
               <p className="text-base font-black text-white">{s.points} pts</p>
             </div>
-            {/* Points bar */}
             <div className="ml-9 h-1 rounded-full bg-white/5 overflow-hidden">
-              <div className="h-full rounded-full transition-all duration-700"
-                style={{ width: `${pct}%`, background: color, opacity: 0.7 }} />
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${pct}%`, background: color, opacity: 0.7 }}
+              />
             </div>
           </div>
         );
@@ -163,7 +170,8 @@ function ConstructorStandings() {
   );
 }
 
-// ── Race Calendar ─────────────────────────────────────
+// ── Race Calendar ──────────────────────────────────────
+
 function RaceCalendar({ onSelectRace }) {
   const [races, setRaces] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -172,8 +180,7 @@ function RaceCalendar({ onSelectRace }) {
     fetch(`${JOLPICA}/2026.json`)
       .then(r => r.json())
       .then(d => {
-        const list = d.MRData?.RaceTable?.Races || [];
-        setRaces(list);
+        setRaces(d.MRData?.RaceTable?.Races || []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -191,12 +198,13 @@ function RaceCalendar({ onSelectRace }) {
 
   return (
     <div className="px-4 space-y-2">
-      {races.map((race) => {
+      {races.map((race, idx) => {
         const raceDate = new Date(race.date + "T" + (race.time || "12:00:00Z"));
         const isPast = raceDate < now;
-        const isNext = !isPast && races.filter(r =>
-          new Date(r.date) < now
-        ).length === races.indexOf(race);
+        const prevPast = idx === 0
+          ? false
+          : new Date(races[idx - 1].date) < now;
+        const isNext = !isPast && prevPast;
 
         return (
           <div
@@ -231,7 +239,9 @@ function RaceCalendar({ onSelectRace }) {
                   </span>
                 ) : (
                   <span className="text-xs text-blue-400/70">
-                    {raceDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                    {raceDate.toLocaleDateString("en-GB", {
+                      day: "numeric", month: "short",
+                    })}
                   </span>
                 )}
               </div>
@@ -243,16 +253,136 @@ function RaceCalendar({ onSelectRace }) {
   );
 }
 
-// ── Race Detail ───────────────────────────────────────
+// ── Practice Schedule ──────────────────────────────────
+
+function PracticeSchedule({ race }) {
+  const now = new Date();
+
+  const sessions = [
+    { name: "Practice 1",  short: "FP1",  date: race.FirstPractice?.date,  time: race.FirstPractice?.time  },
+    { name: "Practice 2",  short: "FP2",  date: race.SecondPractice?.date, time: race.SecondPractice?.time },
+    { name: "Practice 3",  short: "FP3",  date: race.ThirdPractice?.date,  time: race.ThirdPractice?.time  },
+    { name: "Qualifying",  short: "QUAL", date: race.Qualifying?.date,     time: race.Qualifying?.time     },
+    { name: "Sprint",      short: "SPR",  date: race.Sprint?.date,         time: race.Sprint?.time         },
+    { name: "Race",        short: "RACE", date: race.date,                 time: race.time                 },
+  ].filter((s) => s.date);
+
+  return (
+    <div className="space-y-2">
+      {sessions.map((s, i) => {
+        const dt = new Date(`${s.date}T${s.time || "12:00:00Z"}`);
+        const isPast = dt < now;
+        const isNext = !isPast &&
+          sessions
+            .slice(0, i)
+            .every((prev) =>
+              new Date(`${prev.date}T${prev.time || "12:00:00Z"}`) < now
+            );
+        const isRace = s.short === "RACE";
+        const isQual = s.short === "QUAL";
+        const daysAway = Math.ceil((dt - now) / (1000 * 60 * 60 * 24));
+
+        return (
+          <div
+            key={s.short}
+            className={`glass-card rounded-xl px-4 py-3 flex items-center gap-3
+              ${isNext ? "ring-1 ring-violet-500/50" : ""}
+              ${isRace ? "ring-1 ring-red-500/20" : ""}
+            `}
+          >
+            {/* Badge */}
+            <div
+              className="w-12 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{
+                background: isRace
+                  ? "rgba(220,0,0,0.2)"
+                  : isQual
+                  ? "rgba(139,92,246,0.2)"
+                  : "rgba(255,255,255,0.05)",
+                border: isRace
+                  ? "1px solid rgba(220,0,0,0.4)"
+                  : isQual
+                  ? "1px solid rgba(139,92,246,0.4)"
+                  : "1px solid rgba(255,255,255,0.08)",
+              }}
+            >
+              <span
+                className="text-xs font-black"
+                style={{
+                  color: isRace
+                    ? "#ef4444"
+                    : isQual
+                    ? "#8b5cf6"
+                    : "rgba(255,255,255,0.4)",
+                }}
+              >
+                {s.short}
+              </span>
+            </div>
+
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-semibold ${isPast ? "text-white/40" : "text-white"}`}>
+                {s.name}
+              </p>
+              <p className="text-xs text-white/35 mt-0.5">
+                {dt.toLocaleDateString("en-GB", {
+                  weekday: "short", day: "numeric", month: "short",
+                })}
+              </p>
+            </div>
+
+            {/* Time + status */}
+            <div className="text-right flex-shrink-0">
+              <p className={`text-sm font-bold ${isPast ? "text-white/30" : "text-white/70"}`}>
+                {dt.toLocaleTimeString("en-GB", {
+                  hour: "2-digit", minute: "2-digit",
+                })}
+              </p>
+              {isPast ? (
+                <span className="text-xs text-white/20">Done</span>
+              ) : isNext ? (
+                <span className="text-xs text-violet-400 font-semibold">Next up</span>
+              ) : (
+                <span className="text-xs text-white/20">
+                  {daysAway}d away
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+      <p className="text-center text-xs text-white/15 pt-2">
+        Times shown in your local timezone
+      </p>
+    </div>
+  );
+}
+
+// ── Race Detail ────────────────────────────────────────
+
 function RaceDetail({ race, onClose }) {
   const [visible, setVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState("race");
   const [results, setResults] = useState({});
   const [loading, setLoading] = useState(true);
 
+  const raceDate = new Date(race.date + "T" + (race.time || "12:00:00Z"));
+  const isUpcoming = raceDate > new Date();
+
+  const [activeTab, setActiveTab] = useState(isUpcoming ? "practice" : "race");
+
+  const tabs = isUpcoming
+    ? [{ id: "practice", label: "📅 Schedule" }]
+    : [
+        { id: "race",       label: "🏁 Race"       },
+        { id: "qualifying", label: "⏱ Qualifying"  },
+        { id: "sprint",     label: "⚡ Sprint"      },
+      ];
+
   useEffect(() => {
     setTimeout(() => setVisible(true), 10);
-    loadResults();
+    if (!isUpcoming) loadResults();
+    else setLoading(false);
   }, []);
 
   async function loadResults() {
@@ -265,13 +395,13 @@ function RaceDetail({ race, onClose }) {
       ]);
 
       setResults({
-        race:      raceRes.status === "fulfilled"
+        race: raceRes.status === "fulfilled"
           ? raceRes.value.MRData?.RaceTable?.Races?.[0]?.Results || []
           : [],
         qualifying: qualRes.status === "fulfilled"
           ? qualRes.value.MRData?.RaceTable?.Races?.[0]?.QualifyingResults || []
           : [],
-        sprint:    sprintRes.status === "fulfilled"
+        sprint: sprintRes.status === "fulfilled"
           ? sprintRes.value.MRData?.RaceTable?.Races?.[0]?.SprintResults || []
           : [],
       });
@@ -284,17 +414,11 @@ function RaceDetail({ race, onClose }) {
     setTimeout(onClose, 300);
   }
 
-  const tabs = [
-    { id: "race",       label: "Race"      },
-    { id: "qualifying", label: "Qualifying" },
-    { id: "sprint",     label: "Sprint"    },
-  ];
-
   const renderResults = (list) => {
     if (!list?.length) return (
       <div className="text-center py-12">
         <p className="text-4xl mb-3">🏁</p>
-        <p className="text-sm text-white/30">No results yet</p>
+        <p className="text-sm text-white/30">No results available</p>
       </div>
     );
 
@@ -304,11 +428,12 @@ function RaceDetail({ race, onClose }) {
           const color = getTeamColor(r.Constructor?.constructorId);
           const isTop3 = parseInt(r.position) <= 3;
           return (
-            <div key={i}
+            <div
+              key={i}
               className="glass-card rounded-xl px-4 py-2.5 flex items-center gap-3"
               style={isTop3 ? { borderLeft: `3px solid ${color}` } : {}}
             >
-              <span className={`text-sm font-black w-5 text-center tabular-nums ${
+              <span className={`text-sm font-black w-6 text-center tabular-nums ${
                 r.position === "1" ? "text-yellow-400" :
                 r.position === "2" ? "text-slate-300" :
                 r.position === "3" ? "text-amber-600" :
@@ -357,14 +482,16 @@ function RaceDetail({ race, onClose }) {
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-12 pb-4">
-        <div>
+        <div className="flex-1 min-w-0 mr-3">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xs text-white/40 font-semibold uppercase tracking-widest">
               🏎️ Formula 1 · Round {race.round}
             </span>
           </div>
-          <h2 className="text-lg font-black text-white leading-tight"
-            style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+          <h2
+            className="text-lg font-black text-white leading-tight truncate"
+            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+          >
             {race.raceName}
           </h2>
           <p className="text-xs text-white/35 mt-0.5">
@@ -373,9 +500,9 @@ function RaceDetail({ race, onClose }) {
         </div>
         <button
           onClick={handleClose}
-          className="w-9 h-9 glass-strong rounded-full flex items-center justify-center hover:bg-white/10"
+          className="w-9 h-9 glass-strong rounded-full flex items-center justify-center hover:bg-white/10 flex-shrink-0"
         >
-          <span className="text-white/60 text-lg">×</span>
+          <span className="text-white/60 text-xl leading-none">×</span>
         </button>
       </div>
 
@@ -385,28 +512,40 @@ function RaceDetail({ race, onClose }) {
           <span className="text-xs text-white/40">Race date</span>
           <span className="text-sm font-bold text-white">
             {new Date(race.date).toLocaleDateString("en-GB", {
-              weekday: "short", day: "numeric", month: "long", year: "numeric"
+              weekday: "short", day: "numeric",
+              month: "long", year: "numeric",
             })}
           </span>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mx-4 mb-4 glass rounded-xl p-1">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
-              activeTab === tab.id
-                ? "bg-red-600 text-white"
-                : "text-white/40 hover:text-white/70"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Tabs — only show if more than one */}
+      {tabs.length > 1 && (
+        <div className="flex gap-1 mx-4 mb-4 glass rounded-xl p-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                activeTab === tab.id
+                  ? "bg-red-600 text-white"
+                  : "text-white/40 hover:text-white/70"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Single tab label for upcoming */}
+      {tabs.length === 1 && (
+        <div className="px-4 mb-3">
+          <p className="text-xs text-white/30 font-semibold uppercase tracking-widest">
+            📅 Race Weekend Schedule
+          </p>
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 pb-8">
@@ -416,6 +555,8 @@ function RaceDetail({ race, onClose }) {
               <div key={i} className="glass rounded-xl h-14 animate-pulse" />
             ))}
           </div>
+        ) : activeTab === "practice" ? (
+          <PracticeSchedule race={race} />
         ) : (
           renderResults(results[activeTab])
         )}
@@ -424,15 +565,16 @@ function RaceDetail({ race, onClose }) {
   );
 }
 
-// ── Main F1 Page ──────────────────────────────────────
+// ── Main F1 Page ───────────────────────────────────────
+
 export default function F1Page() {
   const [activeTab, setActiveTab] = useState("calendar");
   const [selectedRace, setSelectedRace] = useState(null);
 
   const tabs = [
-    { id: "calendar",     label: "Calendar",      icon: "📅" },
-    { id: "drivers",      label: "Drivers",       icon: "👤" },
-    { id: "constructors", label: "Constructors",  icon: "🏭" },
+    { id: "calendar",     label: "Calendar",     icon: "📅" },
+    { id: "drivers",      label: "Drivers",      icon: "👤" },
+    { id: "constructors", label: "Constructors", icon: "🏭" },
   ];
 
   return (
@@ -447,13 +589,20 @@ export default function F1Page() {
       {/* F1 header */}
       <div className="px-4 pt-2 pb-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ background: "rgba(220,0,0,0.2)", border: "1px solid rgba(220,0,0,0.4)" }}>
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{
+              background: "rgba(220,0,0,0.2)",
+              border: "1px solid rgba(220,0,0,0.4)",
+            }}
+          >
             <span className="text-xl">🏎️</span>
           </div>
           <div>
-            <h2 className="text-base font-black text-white"
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <h2
+              className="text-base font-black text-white"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            >
               Formula 1
             </h2>
             <p className="text-xs text-white/35">2026 World Championship</p>
@@ -472,10 +621,14 @@ export default function F1Page() {
                 ? "text-white"
                 : "glass text-white/50 hover:text-white/80"
             }`}
-            style={activeTab === tab.id ? {
-              background: "rgba(220,0,0,0.3)",
-              border: "1px solid rgba(220,0,0,0.5)"
-            } : {}}
+            style={
+              activeTab === tab.id
+                ? {
+                    background: "rgba(220,0,0,0.3)",
+                    border: "1px solid rgba(220,0,0,0.5)",
+                  }
+                : {}
+            }
           >
             <span>{tab.icon}</span>
             {tab.label}
@@ -483,7 +636,7 @@ export default function F1Page() {
         ))}
       </div>
 
-      {/* Tab content */}
+      {/* Content */}
       {activeTab === "calendar" && (
         <RaceCalendar onSelectRace={setSelectedRace} />
       )}
