@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import MatchCard from "./MatchCard";
 
-export default function LeagueGroup({ league, logo, games, index = 0, onPressGame }) {
+export default function LeagueGroup({ league, logo, games, index, onPressGame, onPressLeague }) {
   const [collapsed, setCollapsed] = useState(false);
   const contentRef = useRef(null);
 
@@ -26,14 +26,15 @@ export default function LeagueGroup({ league, logo, games, index = 0, onPressGam
           className="w-full flex items-center justify-between px-4 py-3 transition-all duration-200 hover:bg-white/4"
         >
           {/* Left — logo + name + live badge */}
-          <div className="flex items-center gap-2.5">
+<div className="flex items-center gap-2.5">
             <span className="text-lg">{logo}</span>
-            <span
-              className="text-sm font-bold text-white tracking-tight"
+            <button
+              onClick={onPressLeague}
+              className="text-sm font-bold text-white tracking-tight hover:text-violet-400 transition-colors"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
-              {league}
-            </span>
+              {league} →
+            </button>
             {liveCount > 0 && (
               <div className="flex items-center gap-1 bg-red-500/15 border border-red-500/20 px-2 py-0.5 rounded-full">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />

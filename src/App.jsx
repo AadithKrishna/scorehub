@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect } from "react";
-import FootballPage from "./components/FootballPage";
 import Header from "./components/Header";
 import SportTabs from "./components/SportTabs";
 import MatchCard from "./components/MatchCard";
@@ -11,6 +10,8 @@ import MatchDetail from "./components/MatchDetail";
 import BottomNav from "./components/BottomNav";
 import F1Page from "./components/F1Page";
 import MotoGPPage from "./components/MotoGPPage";
+import LeagueDetail from "./components/LeagueDetail";
+import TeamDetail from "./components/TeamDetail";
 import { SPORTS, MOTORSPORT_IDS } from "./data/mockData";
 import { useGames } from "./hooks/useGames";
 import useUserStore from "./store/userStore";
@@ -27,6 +28,8 @@ export default function App() {
   const [showSearch, setShowSearch] = useState(false);
   const [highlightedGame, setHighlightedGame] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
+  const [selectedLeague, setSelectedLeague] = useState(null);
+  const [selectedTeam, setSelectedTeam] = useState(null);
 
   const { loadFavorites, loadRecentSearches } = useUserStore();
 
@@ -61,6 +64,8 @@ export default function App() {
     setFilter("all");
     setActiveLeague("all");
     setHighlightedGame(null);
+    setSelectedLeague(null);
+    setSelectedTeam(null);
   }
 
   function handleSelectGame(game) {
@@ -89,6 +94,23 @@ export default function App() {
           onClose={() => setSelectedGame(null)}
         />
       )}
+      {selectedLeague && (
+        <LeagueDetail
+          leagueId={selectedLeague.id}
+          leagueName={selectedLeague.name}
+          leagueFlag={selectedLeague.flag}
+          leagueColor={selectedLeague.color}
+          onSelectTeam={(team) => setSelectedTeam({ team, leagueId: selectedLeague.id })}
+          onClose={() => setSelectedLeague(null)}
+        />
+      )}
+      {selectedTeam && (
+        <TeamDetail
+          team={selectedTeam.team}
+          leagueId={selectedTeam.leagueId}
+          onClose={() => setSelectedTeam(null)}
+        />
+      )}
 
       {/* Sport tabs */}
       <div className="mb-3">
@@ -99,10 +121,9 @@ export default function App() {
         />
       </div>
 
-      {activeSport === "soccer" ? (
-  <FootballPage />
-) : isF1 ? (
-  <F1Page />
+      {/* F1 full page */}
+      {isF1 ? (
+        <F1Page />
 
       /* MotoGP full page */
       ) : isMotoGP ? (
@@ -111,25 +132,19 @@ export default function App() {
       /* Favourites tab */
       ) : isFavouritesTab ? (
         <div className="px-4 pb-8">
-          <FavouritesTab
-            allGames={games}
-            onPress={setSelectedGame}
-          />
+          <FavouritesTab allGames={games} onPress={setSelectedGame} />
         </div>
 
-      /* All other sports */
+      /* All other sports including soccer */
       ) : (
         <>
           {/* Status filter pills */}
-            {!isMotorsport && activeSport !== "soccer" && (
+          {!isMotorsport && (
             <div className="flex gap-2 px-4 mb-3">
               {["all", "live", "finished", "scheduled"].map((f) => (
                 <button
                   key={f}
-                  onClick={() => {
-                    setFilter(f);
-                    setActiveLeague("all");
-                  }}
+                  onClick={() => { setFilter(f); setActiveLeague("all"); }}
                   className={`text-xs px-3 py-1.5 rounded-full font-medium capitalize transition-all
                     ${filter === f
                       ? "bg-violet-600 text-white"
@@ -143,7 +158,7 @@ export default function App() {
           )}
 
           {/* League filter */}
-          {activeSport === "cricket" && !isLoading && (
+          {(activeSport === "soccer" || activeSport === "cricket") && !isLoading && (
             <div className="mb-3">
               <LeagueFilter
                 games={games}
@@ -158,11 +173,8 @@ export default function App() {
             {isLoading ? (
               <div className="px-4 space-y-3">
                 {Array.from({ length: 3 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="glass rounded-2xl h-20 animate-pulse"
-                    style={{ animationDelay: `${i * 100}ms` }}
-                  />
+                  <div key={i} className="glass rounded-2xl h-20 animate-pulse"
+                    style={{ animationDelay: `${i * 100}ms` }} />
                 ))}
               </div>
             ) : filteredGames.length === 0 ? (
@@ -190,12 +202,12 @@ export default function App() {
               (() => {
                 const grouped = filteredGames.reduce((acc, game) => {
                   const key = game.league;
-                  if (!acc[key]) acc[key] = { games: [], logo: game.leagueLogo };
+                  if (!acc[key]) acc[key] = { games: [], logo: game.leagueLogo, leagueId: game.leagueId };
                   acc[key].games.push(game);
                   return acc;
                 }, {});
 
-                return Object.entries(grouped).map(([league, { games, logo }], i) => (
+                return Object.entries(grouped).map(([league, { games, logo, leagueId }], i) => (
                   <LeagueGroup
                     key={league}
                     league={league}
@@ -203,6 +215,19 @@ export default function App() {
                     games={games}
                     index={i}
                     onPressGame={setSelectedGame}
+                    onPressLeague={() => {
+                      const LEAGUE_MAP = {
+                        "Premier League":    { id: "eng.1",          flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", color: "#3d195b" },
+                        "La Liga":           { id: "esp.1",          flag: "🇪🇸", color: "#ee8707" },
+                        "Bundesliga":        { id: "ger.1",          flag: "🇩🇪", color: "#d00027" },
+                        "Serie A":           { id: "ita.1",          flag: "🇮🇹", color: "#1a1a2e" },
+                        "Ligue 1":           { id: "fra.1",          flag: "🇫🇷", color: "#003189" },
+                        "Champions League":  { id: "uefa.champions", flag: "⭐", color: "#0a1172" },
+                        "Europa League":     { id: "uefa.europa",    flag: "🟠", color: "#f37021" },
+                      };
+                      const info = LEAGUE_MAP[league];
+                      if (info) setSelectedLeague({ ...info, name: league });
+                    }}
                   />
                 ));
               })()
