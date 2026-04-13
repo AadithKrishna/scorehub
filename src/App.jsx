@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import FootballPage from "./components/FootballPage";
 import Header from "./components/Header";
 import SportTabs from "./components/SportTabs";
 import MatchCard from "./components/MatchCard";
@@ -98,9 +99,10 @@ export default function App() {
         />
       </div>
 
-      {/* F1 full page */}
-      {isF1 ? (
-        <F1Page />
+      {activeSport === "soccer" ? (
+  <FootballPage />
+) : isF1 ? (
+  <F1Page />
 
       /* MotoGP full page */
       ) : isMotoGP ? (
@@ -119,7 +121,7 @@ export default function App() {
       ) : (
         <>
           {/* Status filter pills */}
-          {!isMotorsport && (
+            {!isMotorsport && activeSport !== "soccer" && (
             <div className="flex gap-2 px-4 mb-3">
               {["all", "live", "finished", "scheduled"].map((f) => (
                 <button
@@ -141,7 +143,7 @@ export default function App() {
           )}
 
           {/* League filter */}
-          {(activeSport === "soccer" || activeSport === "cricket") && !isLoading && (
+          {activeSport === "cricket" && !isLoading && (
             <div className="mb-3">
               <LeagueFilter
                 games={games}
