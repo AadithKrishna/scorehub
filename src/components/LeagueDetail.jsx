@@ -159,68 +159,47 @@ function TopScorers({ leagueId, onSelectPlayer }) {
           const teamColor = result.value.team?.color || "8b5cf6";
 
           athletes.forEach(player => {
-            const offensive = player.statistics?.splits?.categories
-              ?.find(c => c.name === "offensive")?.stats || [];
-            const getStat = name => offensive.find(s => s.name === name)?.value || 0;
-            const goals = getStat("totalGoals");
-            const assists = getStat("goalAssists");
-            const shots = getStat("totalShots");
-            const shotsOnTarget = getStat("shotsOnTarget");
-            const apps = general.find(s => s.name === "appearances")?.value || 0;
-            const general = player.statistics?.splits?.categories
-                ?.find(c => c.name === "general")?.stats || [];
-            const gk = player.statistics?.splits?.categories
-                ?.find(c => c.name === "goalKeeping")?.stats || [];
-            const getGen = name => general.find(s => s.name === name)?.value || 0;
-            const getGK = name => gk.find(s => s.name === name)?.value || 0;
+  const offensive = player.statistics?.splits?.categories
+    ?.find(c => c.name === "offensive")?.stats || [];
+  const general = player.statistics?.splits?.categories
+    ?.find(c => c.name === "general")?.stats || [];
+  const gk = player.statistics?.splits?.categories
+    ?.find(c => c.name === "goalKeeping")?.stats || [];
 
-if (goals > 0 || assists > 0 || getGK("saves") > 0) {
-  allPlayers.push({
-    id: player.id,
-    name: player.displayName,
-    shortName: player.shortName,
-    nationality: player.citizenship,
-    flag: player.flag?.href,
-    position: player.position?.abbreviation,
-    jersey: player.jersey,
-    teamName,
-    teamLogo,
-    teamColor: `#${teamColor}`,
-    goals,
-    assists,
-    shots,
-    shotsOnTarget,
-    apps: getGen("appearances"),
-    yellowCards: getGen("yellowCards"),
-    redCards: getGen("redCards"),
-    foulsCommitted: getGen("foulsCommitted"),
-    foulsSuffered: getGen("foulsSuffered"),
-    saves: getGK("saves"),
-    shotsFaced: getGK("shotsFaced"),
-    goalsConceded: getGK("goalsConceded"),
-  });
-}
+  const getStat = name => offensive.find(s => s.name === name)?.value || 0;
+  const getGen  = name => general.find(s => s.name === name)?.value || 0;
+  const getGK   = name => gk.find(s => s.name === name)?.value || 0;
 
-            if (goals > 0 || assists > 0) {
-              allPlayers.push({
-                id: player.id,
-                name: player.displayName,
-                shortName: player.shortName,
-                nationality: player.citizenship,
-                flag: player.flag?.href,
-                position: player.position?.abbreviation,
-                jersey: player.jersey,
-                teamName,
-                teamLogo,
-                teamColor: `#${teamColor}`,
-                goals,
-                assists,
-                shots,
-                shotsOnTarget,
-                apps,
-              });
-            }
-          });
+  const goals   = getStat("totalGoals");
+  const assists = getStat("goalAssists");
+
+  if (goals > 0 || assists > 0) {
+    allPlayers.push({
+      id: player.id,
+      name: player.displayName,
+      shortName: player.shortName,
+      nationality: player.citizenship,
+      flag: player.flag?.href,
+      position: player.position?.abbreviation,
+      jersey: player.jersey,
+      teamName,
+      teamLogo,
+      teamColor: `#${teamColor}`,
+      goals,
+      assists,
+      shots:         getStat("totalShots"),
+      shotsOnTarget: getStat("shotsOnTarget"),
+      apps:          getGen("appearances"),
+      yellowCards:   getGen("yellowCards"),
+      redCards:      getGen("redCards"),
+      foulsCommitted: getGen("foulsCommitted"),
+      foulsSuffered:  getGen("foulsSuffered"),
+      saves:          getGK("saves"),
+      shotsFaced:     getGK("shotsFaced"),
+      goalsConceded:  getGK("goalsConceded"),
+    });
+  }
+});
         });
 
         // Sort by goals and assists
