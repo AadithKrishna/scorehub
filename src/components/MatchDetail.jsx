@@ -43,6 +43,9 @@ async function fetchMatchDetails(game) {
           player: play.participants?.[0]?.athlete?.displayName || "Unknown",
           assist: assistMatch?.[1]?.trim() || null,
           goalType: cleanGoalType || null,
+          fieldPositionX: play.fieldPositionX || 0,
+          fieldPositionY: play.fieldPositionY || 0,
+          originalText: play.text || "",
         });
       } else if (typeText.includes("yellow") || typeLabel.includes("yellow")) {
         events.push({ type: "yellowcard", minute: min, minuteNum, team, player: play.participants?.[0]?.athlete?.displayName || "Unknown" });
@@ -682,6 +685,319 @@ function OddsCard({ odds, homeTeam, awayTeam }) {
   );
 }
 
+// ── Shots & xG Tab ────────────────────────────────────
+
+function ShotsTab({ events, stats, homeTeam, awayTeam, homeTeamId, awayTeamId }) {
+  const goals = events.filter(e => e.type === "goal" && e.fieldPositionX);
+
+  // Parse shot location from text
+  function parseLocation(text = "") {
+    const t = text.toLowerCase();
+    if (t.includes("penalty")) return "Penalty spot";
+    if (t.includes("centre of the box") || t.includes("center of the box")) return "Centre of box";
+    if (t.includes("right side of the box")) return "Right side of box";
+    if (t.includes("left side of the box")) return "Left side of box";
+    if (t.includes("close range")) return "Close range";
+    if (t.includes("outside the box") || t.includes("long range")) return "Outside box";
+    if (t.includes("header")) return "Header";
+    if (t.includes("volley")) return "Volley";
+    return "Box";
+  }
+
+  function parseCorner(text = "") {
+    const t = text.toLowerCase();
+    if (t.includes("bottom right")) return { x: 0.85, y: 0.8 };
+    if (t.includes("bottom left")) return { x: 0.15, y: 0.8 };
+    if (t.includes("top right")) return { x: 0.85, y: 0.15 };
+    if (t.includes("top left")) return { x: 0.15, y: 0.15 };
+    if (t.includes("bottom centre") || t.includes("bottom center")) return { x: 0.5, y: 0.85 };
+    if (t.includes("top centre") || t.includes("top center")) return { x: 0.5, y: 0.1 };
+    return { x: 0.5, y: 0.5 };
+  }
+
+  // Simulated xG from stats
+  const homeShotsOnTarget = stats.shotsOnTarget?.home || 0;
+  const awayShotsOnTarget = stats.shotsOnTarget?.away || 0;
+  const homeShots = stats.shots?.home || 0;
+  const awayShots = stats.shots?.away || 0;
+  const homeGoals = events.filter(e => e.type === "goal" && e.team === "home").length;
+  const awayGoals = events.filter(e => e.type === "goal" && e.team === "away").length;
+
+  // xG formula: on target shots weighted by position
+  const calcXG = (shots, onTarget, goals) => {
+    const offTarget = shots - onTarget;
+    return ((onTarget * 0.30) + (offTarget * 0.04)).toFixed(2);
+  };
+
+  const homeXG = calcXG(homeShots, homeShotsOnTarget, homeGoals);
+  const awayXG = calcXG(awayShots, awayShotsOnTarget, awayGoals);
+  const maxXG = Math.max(parseFloat(homeXG), parseFloat(awayXG), 0.5);
+
+  // Pitch dimensions for SVG
+  const PW = 300, PH = 200;
+
+  return (
+    <div className="space-y-4">
+
+      {/* xG Summary */}
+      <div className="glass-card rounded-2xl p-4">
+        <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-4">
+          Expected Goals (xG)
+        </p>
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-center flex-1">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <img src={homeTeam.logo} alt="" className="w-6 h-6 object-contain" />
+              <span className="text-xs text-white/50 truncate">{homeTeam.shortName || homeTeam.name}</span>
+            </div>
+            <p className="text-3xl font-black text-white">{homeXG}</p>
+            <p className="text-xs text-white/30 mt-0.5">xG</p>
+          </div>
+          <div className="text-center px-4">
+            <p className="text-xs text-white/20 font-semibold">vs</p>
+            <p className="text-xs text-white/15 mt-1">Expected</p>
+          </div>
+          <div className="text-center flex-1">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <img src={awayTeam.logo} alt="" className="w-6 h-6 object-contain" />
+              <span className="text-xs text-white/50 truncate">{awayTeam.shortName || awayTeam.name}</span>
+            </div>
+            <p className="text-3xl font-black text-white">{awayXG}</p>
+            <p className="text-xs text-white/30 mt-0.5">xG</p>
+          </div>
+        </div>
+
+        {/* xG bars */}
+        <div className="space-y-2">
+          {[
+            { label: "xG", home: parseFloat(homeXG), away: parseFloat(awayXG), max: maxXG, color: "#8b5cf6" },
+            { label: "Shots", home: homeShots, away: awayShots, max: Math.max(homeShots, awayShots, 1), color: "#3b82f6" },
+            { label: "On Target", home: homeShotsOnTarget, away: awayShotsOnTarget, max: Math.max(homeShotsOnTarget, awayShotsOnTarget, 1), color: "#10b981" },
+          ].map(row => (
+            <div key={row.label}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-bold text-white w-8 tabular-nums">{row.home}</span>
+                <span className="text-xs text-white/30">{row.label}</span>
+                <span className="text-sm font-bold text-white w-8 text-right tabular-nums">{row.away}</span>
+              </div>
+              <div className="flex h-1.5 rounded-full overflow-hidden gap-0.5">
+                <div className="rounded-full transition-all duration-700"
+                  style={{ width: `${(row.home / (row.home + row.away || 1)) * 100}%`, background: row.color, opacity: 0.8 }} />
+                <div className="rounded-full transition-all duration-700"
+                  style={{ width: `${(row.away / (row.home + row.away || 1)) * 100}%`, background: "rgba(255,255,255,0.15)" }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <p className="text-xs text-white/15 text-center mt-3">
+          * xG calculated from shot quality data
+        </p>
+      </div>
+
+      {/* Shot funnel */}
+      <div className="glass-card rounded-2xl p-4">
+        <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-4">
+          Shot Funnel
+        </p>
+        <div className="flex gap-4">
+          {[
+            { team: homeTeam, shots: homeShots, onTarget: homeShotsOnTarget, goals: homeGoals, color: "#8b5cf6" },
+            { team: awayTeam, shots: awayShots, onTarget: awayShotsOnTarget, goals: awayGoals, color: "#06b6d4" },
+          ].map((t, i) => (
+            <div key={i} className="flex-1">
+              <div className="flex items-center gap-1.5 mb-3">
+                <img src={t.team.logo} alt="" className="w-4 h-4 object-contain" />
+                <span className="text-xs font-semibold text-white/60 truncate">
+                  {t.team.shortName || t.team.name}
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                {[
+                  { label: "Shots", value: t.shots, pct: 100 },
+                  { label: "On Target", value: t.onTarget, pct: t.shots > 0 ? (t.onTarget / t.shots) * 100 : 0 },
+                  { label: "Goals", value: t.goals, pct: t.shots > 0 ? (t.goals / t.shots) * 100 : 0 },
+                ].map(row => (
+                  <div key={row.label}>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-xs text-white/30">{row.label}</span>
+                      <span className="text-xs font-bold text-white">{row.value}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${row.pct}%`, background: t.color, opacity: 0.7 }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Goal map */}
+      {goals.length > 0 && (
+        <div className="glass-card rounded-2xl p-4">
+          <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
+            Goal Map
+          </p>
+
+          {/* SVG Pitch */}
+          <div className="relative rounded-xl overflow-hidden mb-3"
+            style={{ background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.15)" }}>
+            <svg width="100%" viewBox={`0 0 ${PW} ${PH}`} style={{ display: "block" }}>
+              {/* Pitch outline */}
+              <rect x="5" y="5" width={PW-10} height={PH-10} fill="none"
+                stroke="rgba(255,255,255,0.1)" strokeWidth="1" rx="2" />
+
+              {/* Centre circle */}
+              <circle cx={PW/2} cy={PH/2} r="30" fill="none"
+                stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+              <line x1={PW/2} y1="5" x2={PW/2} y2={PH-5}
+                stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+
+              {/* Left penalty area */}
+              <rect x="5" y={PH/2 - 40} width="55" height="80" fill="none"
+                stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+              {/* Left 6 yard box */}
+              <rect x="5" y={PH/2 - 20} width="20" height="40" fill="none"
+                stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+              {/* Left goal */}
+              <rect x="3" y={PH/2 - 10} width="5" height="20"
+                fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+
+              {/* Right penalty area */}
+              <rect x={PW-60} y={PH/2 - 40} width="55" height="80" fill="none"
+                stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+              {/* Right 6 yard box */}
+              <rect x={PW-25} y={PH/2 - 20} width="20" height="40" fill="none"
+                stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+              {/* Right goal */}
+              <rect x={PW-8} y={PH/2 - 10} width="5" height="20"
+                fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+
+              {/* Goal dots */}
+              {goals.map((g, i) => {
+                // fieldPositionX/Y are 0-1 from the attacking team's perspective
+                // X = horizontal (0=left, 1=right), Y = vertical (0=top, 1=bottom)
+                const isHome = g.team === "home";
+                // Home team attacks right to left, away attacks left to right
+                // Map to pitch coordinates
+                const px = isHome
+                  ? PW - (g.fieldPositionX * (PW - 20) + 10)
+                  : g.fieldPositionX * (PW - 20) + 10;
+                const py = g.fieldPositionY * (PH - 10) + 5;
+                const color = isHome ? "#8b5cf6" : "#06b6d4";
+
+                return (
+                  <g key={i}>
+                    {/* Glow */}
+                    <circle cx={px} cy={py} r="10" fill={color} opacity="0.15" />
+                    {/* Main dot */}
+                    <circle cx={px} cy={py} r="6" fill={color} opacity="0.9"
+                      stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" />
+                    {/* Ball icon */}
+                    <text x={px} y={py + 4} textAnchor="middle" fontSize="7">⚽</text>
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+
+          {/* Goal details */}
+          <div className="space-y-2">
+            {goals.map((g, i) => {
+              const isHome = g.team === "home";
+              const location = parseLocation(g.originalText || "");
+              const color = isHome ? "#8b5cf6" : "#06b6d4";
+              return (
+                <div key={i} className={`flex items-center gap-3 ${isHome ? "" : "flex-row-reverse"}`}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ background: `${color}20`, border: `1px solid ${color}40` }}>
+                    <span className="text-sm">⚽</span>
+                  </div>
+                  <div className={`flex-1 min-w-0 ${isHome ? "" : "text-right"}`}>
+                    <p className="text-sm font-bold text-white truncate">{g.player}</p>
+                    <p className="text-xs text-white/30 truncate">{g.minute} · {g.goalType || "Goal"}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Match momentum */}
+      <div className="glass-card rounded-2xl p-4">
+        <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
+          Match Momentum
+        </p>
+        <p className="text-xs text-white/20 mb-3">Based on key events per 15 min period</p>
+
+        {(() => {
+          const periods = [0, 15, 30, 45, 60, 75, 90];
+          const allEvents = [...events].filter(e => e.minuteNum > 0);
+
+          return (
+            <div>
+              <div className="flex items-center gap-1 mb-1">
+                {periods.slice(0, -1).map((start, i) => {
+                  const end = periods[i + 1];
+                  const periodEvents = allEvents.filter(e => e.minuteNum >= start && e.minuteNum < end);
+                  const homeCount = periodEvents.filter(e => e.team === "home").length;
+                  const awayCount = periodEvents.filter(e => e.team === "away").length;
+                  const total = homeCount + awayCount;
+                  const homePct = total > 0 ? (homeCount / total) * 100 : 50;
+
+                  return (
+                    <div key={start} className="flex-1">
+                      <div className="flex flex-col h-16 gap-0.5">
+                        {/* Home bar (top) */}
+                        <div className="flex-1 flex items-end">
+                          <div className="w-full rounded-t-sm transition-all duration-700"
+                            style={{
+                              height: `${Math.max(homePct, 5)}%`,
+                              background: total > 0 ? "#8b5cf6" : "rgba(139,92,246,0.15)",
+                              opacity: total > 0 ? 0.7 + (homeCount * 0.1) : 0.15,
+                            }} />
+                        </div>
+                        {/* Centre line */}
+                        <div className="h-px bg-white/10" />
+                        {/* Away bar (bottom) */}
+                        <div className="flex-1 flex items-start">
+                          <div className="w-full rounded-b-sm transition-all duration-700"
+                            style={{
+                              height: `${Math.max(100 - homePct, 5)}%`,
+                              background: total > 0 ? "#06b6d4" : "rgba(6,182,212,0.15)",
+                              opacity: total > 0 ? 0.7 + (awayCount * 0.1) : 0.15,
+                            }} />
+                        </div>
+                      </div>
+                      <p className="text-center text-xs text-white/15 mt-1">{start}'</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Legend */}
+              <div className="flex items-center justify-between mt-3">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-violet-500" />
+                  <span className="text-xs text-white/30">{homeTeam.shortName || homeTeam.name}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-white/30">{awayTeam.shortName || awayTeam.name}</span>
+                  <div className="w-2 h-2 rounded-full bg-cyan-500" />
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────
 
 export default function MatchDetail({ game, onClose, onSelectTeam }) {
@@ -746,8 +1062,9 @@ export default function MatchDetail({ game, onClose, onSelectTeam }) {
   };
   const leagueId = LEAGUE_MAP[game.league] || "eng.1";
 
-  const tabs = [
+ const tabs = [
     { id: "stats",    label: "Stats"    },
+    { id: "shots",    label: "xG"       },
     { id: "timeline", label: "Timeline" },
     { id: "h2h",      label: "H2H"      },
     { id: "players",  label: "Players"  },
@@ -877,6 +1194,19 @@ export default function MatchDetail({ game, onClose, onSelectTeam }) {
               {isScheduled && <p className="text-center text-xs text-white/20 mt-4">Stats available once match starts</p>}
             </div>
           </>
+        ))}
+
+        {activeTab === "shots" && (loadingDetails ? (
+          <div className="space-y-4">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="glass rounded-xl h-32 animate-pulse" />)}</div>
+        ) : (
+          <ShotsTab
+            events={events}
+            stats={stats}
+            homeTeam={game.homeTeam}
+            awayTeam={game.awayTeam}
+            homeTeamId={details?.homeTeamId}
+            awayTeamId={details?.awayTeamId}
+          />
         ))}
 
         {activeTab === "timeline" && (loadingDetails ? (
