@@ -130,18 +130,15 @@ function TopScorers({ leagueId, onSelectPlayer }) {
   useEffect(() => {
     async function load() {
       try {
-        // Step 1: Get all team IDs from standings
         const standingsRes = await fetch(
           `https://site.api.espn.com/apis/v2/sports/soccer/${leagueId}/standings`
         );
         const standingsData = await standingsRes.json();
         const teamIds = standingsData.children?.[0]?.standings?.entries
-          ?.map(e => e.team?.id)
-          .filter(Boolean) || [];
+          ?.map(e => e.team?.id).filter(Boolean) || [];
 
         if (!teamIds.length) throw new Error("No teams found");
 
-        // Step 2: Fetch all rosters in parallel
         const rosterResults = await Promise.allSettled(
           teamIds.map(id =>
             fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueId}/teams/${id}/roster`)
@@ -149,69 +146,67 @@ function TopScorers({ leagueId, onSelectPlayer }) {
           )
         );
 
-        // Step 3: Extract player stats
         const allPlayers = [];
+
         rosterResults.forEach(result => {
           if (result.status !== "fulfilled") return;
-          const athletes = result.value.athletes || [];
-          const teamName = result.value.team?.displayName || "";
-          const teamLogo = result.value.team?.logo || "";
-          const teamColor = result.value.team?.color || "8b5cf6";
+          const data = result.value;
+          const athletes = data.athletes || [];
+          const teamName = data.team?.displayName || "";
+          const teamLogo = data.team?.logo || "";
+          const teamColor = data.team?.color || "8b5cf6";
 
           athletes.forEach(player => {
-  const offensive = player.statistics?.splits?.categories
-    ?.find(c => c.name === "offensive")?.stats || [];
-  const general = player.statistics?.splits?.categories
-    ?.find(c => c.name === "general")?.stats || [];
-  const gk = player.statistics?.splits?.categories
-    ?.find(c => c.name === "goalKeeping")?.stats || [];
+            const offensive = player.statistics?.splits?.categories
+              ?.find(c => c.name === "offensive")?.stats || [];
+            const general = player.statistics?.splits?.categories
+              ?.find(c => c.name === "general")?.stats || [];
+            const gk = player.statistics?.splits?.categories
+              ?.find(c => c.name === "goalKeeping")?.stats || [];
 
-  const getStat = name => offensive.find(s => s.name === name)?.value || 0;
-  const getGen  = name => general.find(s => s.name === name)?.value || 0;
-  const getGK   = name => gk.find(s => s.name === name)?.value || 0;
+            const getStat  = name => offensive.find(s => s.name === name)?.value || 0;
+            const getGen   = name => general.find(s => s.name === name)?.value || 0;
+            const getGK    = name => gk.find(s => s.name === name)?.value || 0;
 
-  const goals   = getStat("totalGoals");
-  const assists = getStat("goalAssists");
+            const goals   = getStat("totalGoals");
+            const assists = getStat("goalAssists");
 
-  if (goals > 0 || assists > 0) {
-    allPlayers.push({
-      id: player.id,
-      name: player.displayName,
-      shortName: player.shortName,
-      nationality: player.citizenship,
-      flag: player.flag?.href,
-      position: player.position?.abbreviation,
-      jersey: player.jersey,
-      teamName,
-      teamLogo,
-      teamColor: `#${teamColor}`,
-      goals,
-      assists,
-      shots:         getStat("totalShots"),
-      shotsOnTarget: getStat("shotsOnTarget"),
-      apps:          getGen("appearances"),
-      yellowCards:   getGen("yellowCards"),
-      redCards:      getGen("redCards"),
-      foulsCommitted: getGen("foulsCommitted"),
-      foulsSuffered:  getGen("foulsSuffered"),
-      saves:          getGK("saves"),
-      shotsFaced:     getGK("shotsFaced"),
-      goalsConceded:  getGK("goalsConceded"),
-    });
-  }
-});
+            if (goals > 0 || assists > 0) {
+              allPlayers.push({
+                id: player.id,
+                name: player.displayName,
+                nationality: player.citizenship,
+                flag: player.flag?.href,
+                position: player.position?.abbreviation,
+                jersey: player.jersey,
+                teamName,
+                teamLogo,
+                teamColor: `#${teamColor}`,
+                goals,
+                assists,
+                shots:          getStat("totalShots"),
+                shotsOnTarget:  getStat("shotsOnTarget"),
+                apps:           getGen("appearances"),
+                yellowCards:    getGen("yellowCards"),
+                redCards:       getGen("redCards"),
+                foulsCommitted: getGen("foulsCommitted"),
+                foulsSuffered:  getGen("foulsSuffered"),
+                saves:          getGK("saves"),
+                shotsFaced:     getGK("shotsFaced"),
+                goalsConceded:  getGK("goalsConceded"),
+              });
+            }
+          });
         });
 
-        // Sort by goals and assists
-        const byGoals = [...allPlayers].sort((a, b) =>
+        setScorers([...allPlayers].sort((a, b) =>
           b.goals !== a.goals ? b.goals - a.goals : b.assists - a.assists
-        );
-        const byAssists = [...allPlayers].sort((a, b) =>
-          b.assists !== a.assists ? b.assists - a.assists : b.goals - a.goals
-        );
+        ).slice(0, 20));
 
-        setScorers(byGoals.slice(0, 20));
-        setAssisters(byAssists.slice(0, 20));
+        setAssisters([...allPlayers].sort((a, b) =>
+          b.assists !== a.assists ? b.assists - a.assists : b.goals - a.goals
+        ).slice(0, 20));
+
         setLoading(false);
       } catch (err) {
         console.warn("Failed to load scorers:", err.message);
@@ -244,7 +239,6 @@ function TopScorers({ leagueId, onSelectPlayer }) {
 
   return (
     <div>
-      {/* Toggle */}
       <div className="flex gap-1 mb-4 glass rounded-xl p-1">
         {[
           { id: "goals",   label: "⚽ Top Scorers"  },
@@ -268,10 +262,9 @@ function TopScorers({ leagueId, onSelectPlayer }) {
         {list.map((p, i) => (
           <div
             key={p.id}
-        onClick={() => onSelectPlayer?.(p)}
+            onClick={() => onSelectPlayer?.(p)}
             className="glass-card rounded-xl px-4 py-2.5 flex items-center gap-3 cursor-pointer active:scale-[0.99] hover:bg-white/5 transition-all"
->
-            {/* Rank */}
+          >
             <span className={`text-sm font-black w-6 text-center flex-shrink-0 ${
               i === 0 ? "text-yellow-400" :
               i === 1 ? "text-slate-300" :
@@ -280,12 +273,10 @@ function TopScorers({ leagueId, onSelectPlayer }) {
             }`}>
               {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
             </span>
-
-            {/* Player info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 {p.flag && (
-                  <img src={p.flag} alt="" className="w-3.5 h-3.5 object-contain flex-shrink-0" />
+                  <img src={p.flag} alt="" className="w-3.5 h-3 object-cover rounded-sm flex-shrink-0" />
                 )}
                 <p className="text-sm font-bold text-white truncate">{p.name}</p>
               </div>
@@ -294,11 +285,9 @@ function TopScorers({ leagueId, onSelectPlayer }) {
                   <img src={p.teamLogo} alt="" className="w-3.5 h-3.5 object-contain flex-shrink-0" />
                 )}
                 <p className="text-xs text-white/35 truncate">{p.teamName}</p>
-                <span className="text-xs text-white/20">· {p.apps} apps</span>
+                <span className="text-xs text-white/20 flex-shrink-0">· {p.apps} apps</span>
               </div>
             </div>
-
-            {/* Stats */}
             <div className="flex items-center gap-3 flex-shrink-0">
               <div className="text-center">
                 <p className="text-lg font-black text-white">{p[statKey]}</p>
