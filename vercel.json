@@ -1,7 +1,19 @@
 {
   "rewrites": [
     {
-      "source": "/((?!api/).*)",
+      "source": "/api/motogp",
+      "destination": "/api/motogp"
+    },
+    {
+      "source": "/api/f1",
+      "destination": "/api/f1"
+    },
+    {
+      "source": "/api/understat",
+      "destination": "/api/understat"
+    },
+    {
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
