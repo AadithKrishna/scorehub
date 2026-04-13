@@ -89,11 +89,15 @@ export default function App() {
         />
       )}
       {selectedGame && (
-        <MatchDetail
-          game={selectedGame}
-          onClose={() => setSelectedGame(null)}
-        />
-      )}
+  <MatchDetail
+    game={selectedGame}
+    onClose={() => setSelectedGame(null)}
+    onSelectTeam={(team, leagueId) => {
+      setSelectedGame(null);
+      setTimeout(() => setSelectedTeam({ team, leagueId }), 350);
+    }}
+  />
+)}
       {selectedLeague && (
         <LeagueDetail
           leagueId={selectedLeague.id}

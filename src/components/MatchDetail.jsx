@@ -12,8 +12,12 @@ async function fetchMatchDetails(game) {
     if (!res.ok) return null;
     const data = await res.json();
 
-    const homeTeamId = data.header?.competitions?.[0]?.competitors
-      ?.find(c => c.homeAway === "home")?.team?.id;
+    // ── Team IDs from header ─────────────────────────
+    const competitors = data.header?.competitions?.[0]?.competitors || [];
+    const homeComp = competitors.find(c => c.homeAway === "home");
+    const awayComp = competitors.find(c => c.homeAway === "away");
+    const homeTeamId = homeComp?.team?.id;
+    const awayTeamId = awayComp?.team?.id;
 
     // ── Events ──────────────────────────────────────
     const events = [];
@@ -67,7 +71,7 @@ async function fetchMatchDetails(game) {
       offsides:      { home: getStat(homeStats, "offsides"), away: getStat(awayStats, "offsides") },
     };
 
-    // ── Leaders ──────────────────────────────────────
+    // ── Leaders — keyed by exact team ID ────────────
     const leaders = (data.leaders || []).map(teamLeaders => ({
       teamId: teamLeaders.team?.id,
       teamName: teamLeaders.team?.displayName,
@@ -76,35 +80,52 @@ async function fetchMatchDetails(game) {
         name: l.athlete?.displayName,
         goals: l.statistics?.find(s => s.name === "totalGoals")?.value || 0,
         apps: l.statistics?.find(s => s.name === "appearances")?.value || 0,
-        jersey: l.athlete?.jersey,
       })) || [],
       assists: teamLeaders.leaders?.find(l => l.name === "assistsLeaders")?.leaders?.slice(0, 3).map(l => ({
         name: l.athlete?.displayName,
         assists: l.mainStat?.value || 0,
         apps: l.statistics?.find(s => s.name === "appearances")?.value || 0,
-        jersey: l.athlete?.jersey,
       })) || [],
     }));
 
-    // ── H2H ─────────────────────────────────────────
-    const h2hRaw = data.headToHeadGames || [];
-    const h2h = h2hRaw.flatMap(teamH2H =>
-      (teamH2H.events || []).filter(e => e.competitionName?.includes("Premier") || e.competitionName?.includes("La Liga") || e.competitionName?.includes("Bundesliga") || e.competitionName?.includes("Serie") || e.competitionName?.includes("Ligue") || e.competitionName?.includes("Champions") || e.competitionName?.includes("Europa"))
-    ).reduce((acc, e) => {
-      if (!acc.find(x => x.id === e.id)) acc.push(e);
-      return acc;
-    }, []).sort((a, b) => new Date(b.gameDate) - new Date(a.gameDate)).slice(0, 10);
+    // ── H2H — only one team's perspective returned ──
+    // gameResult is from that team's POV: W=they won, L=they lost, D=draw
+    const h2hTeamData = data.headToHeadGames?.[0];
+    const h2hTeamId = h2hTeamData?.team?.id; // e.g. "360" = Man United
+    const h2hEvents = (h2hTeamData?.events || [])
+      .filter(e => {
+        const name = e.competitionName || "";
+        return name.includes("Premier") || name.includes("La Liga") ||
+          name.includes("Bundesliga") || name.includes("Serie") ||
+          name.includes("Ligue") || name.includes("Champions") ||
+          name.includes("Europa") || name.includes("Cup");
+      })
+      .sort((a, b) => new Date(b.gameDate) - new Date(a.gameDate))
+      .slice(0, 8)
+      .map(e => ({
+        ...e,
+        // Determine who won from neutral perspective
+        // gameResult is from h2hTeamId's perspective
+        h2hTeamWon: e.gameResult === "W",
+        h2hTeamLost: e.gameResult === "L",
+        isDraw: e.gameResult === "D",
+        h2hTeamId,
+      }));
 
-    // ── Standings ────────────────────────────────────
+    // ── Standings ─────────────────────────────────
     const standingsEntries = data.standings?.groups?.[0]?.standings?.entries || [];
 
-    // ── Odds ─────────────────────────────────────────
+    // ── Odds ────────────────────────────────────────
     const odds = data.odds?.[0] || null;
 
     const venue = data.gameInfo?.venue?.fullName || null;
     const referee = data.gameInfo?.officials?.[0]?.displayName || null;
 
-    return { events, stats, leaders, h2h, standingsEntries, odds, venue, referee };
+    return {
+      events, stats, leaders, h2h: h2hEvents,
+      standingsEntries, odds, venue, referee,
+      homeTeamId, awayTeamId,
+    };
   } catch (err) {
     console.warn("Failed to fetch match details:", err.message);
     return null;
@@ -127,20 +148,23 @@ function TeamLogo({ logo, name, size = "lg" }) {
   const [bg] = getColor(name);
   const initials = name?.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "??";
   const isUrl = logo?.startsWith("http");
-  const sizeClass = size === "lg" ? "w-20 h-20 rounded-2xl" : size === "sm" ? "w-12 h-12 rounded-xl" : "w-8 h-8 rounded-lg";
-  const imgSize = size === "lg" ? "w-16 h-16" : size === "sm" ? "w-9 h-9" : "w-6 h-6";
-  const fontSize = size === "lg" ? "16px" : size === "sm" ? "11px" : "9px";
+  const sizes = {
+    lg: { box: "w-20 h-20 rounded-2xl", img: "w-16 h-16", font: "16px" },
+    sm: { box: "w-12 h-12 rounded-xl", img: "w-9 h-9", font: "11px" },
+    xs: { box: "w-8 h-8 rounded-lg",   img: "w-6 h-6", font: "9px"  },
+  };
+  const s = sizes[size] || sizes.lg;
 
   if (isUrl) return (
-    <div className={`${sizeClass} glass-strong flex items-center justify-center flex-shrink-0 overflow-hidden p-2`}>
-      <img src={logo} alt={name} className={`${imgSize} object-contain`}
-        onError={e => { e.target.style.display = "none"; e.target.parentElement.innerHTML = `<span style="font-size:${fontSize};font-weight:800;color:${bg}">${initials}</span>`; }} />
+    <div className={`${s.box} glass-strong flex items-center justify-center flex-shrink-0 overflow-hidden p-2`}>
+      <img src={logo} alt={name} className={`${s.img} object-contain`}
+        onError={e => { e.target.style.display = "none"; e.target.parentElement.innerHTML = `<span style="font-size:${s.font};font-weight:800;color:${bg}">${initials}</span>`; }} />
     </div>
   );
   return (
-    <div className={`${sizeClass} flex items-center justify-center flex-shrink-0`}
+    <div className={`${s.box} flex items-center justify-center flex-shrink-0`}
       style={{ background: `linear-gradient(135deg, ${bg}25, ${bg}10)`, border: `1px solid ${bg}40` }}>
-      <span style={{ color: bg, fontSize, fontWeight: 800 }}>{initials}</span>
+      <span style={{ color: bg, fontSize: s.font, fontWeight: 800 }}>{initials}</span>
     </div>
   );
 }
@@ -310,45 +334,74 @@ function H2H({ h2h, homeTeam, awayTeam }) {
     </div>
   );
 
-  // Summary stats
-  const homeId = homeTeam.id?.replace ? undefined : homeTeam.id;
-  let homeWins = 0, awayWins = 0, draws = 0;
+  // h2hTeamId is the team whose perspective we have
+  // W = h2hTeam won, L = h2hTeam lost, D = draw
+  // We need to figure out if h2hTeam is home or away
+  const h2hTeamId = h2h[0]?.h2hTeamId;
+  const isH2HTeamHome = h2hTeamId === homeTeam.id;
+
+  let h2hTeamWins = 0, opponentWins = 0, draws = 0;
   h2h.forEach(m => {
-    if (m.gameResult === "W" && m.homeTeamId === homeId) homeWins++;
-    else if (m.gameResult === "W" && m.awayTeamId === homeId) awayWins++;
-    else if (m.gameResult === "D") draws++;
+    if (m.isDraw) draws++;
+    else if (m.h2hTeamWon) {
+      if (isH2HTeamHome) h2hTeamWins++; else opponentWins++;
+    } else if (m.h2hTeamLost) {
+      if (isH2HTeamHome) opponentWins++; else h2hTeamWins++;
+    }
   });
+
+  const homeWins = isH2HTeamHome ? h2hTeamWins : opponentWins;
+  const awayWins = isH2HTeamHome ? opponentWins : h2hTeamWins;
 
   return (
     <div className="space-y-4">
       {/* Summary */}
       <div className="glass-card rounded-2xl p-4">
-        <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">Last {h2h.length} Meetings</p>
-        <div className="flex items-center gap-3">
+        <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
+          Last {h2h.length} Meetings
+        </p>
+        <div className="flex items-center gap-3 mb-3">
           <div className="flex-1 text-center">
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <TeamLogo logo={homeTeam.logo} name={homeTeam.name} size="xs" />
-            </div>
+            <img src={homeTeam.logo} alt="" className="w-8 h-8 object-contain mx-auto mb-1" />
             <p className="text-2xl font-black text-white">{homeWins}</p>
-            <p className="text-xs text-white/30">Wins</p>
+            <p className="text-xs text-white/30">
+              {homeTeam.shortName || homeTeam.name}
+            </p>
           </div>
           <div className="flex-1 text-center">
             <p className="text-2xl font-black text-white/40">{draws}</p>
             <p className="text-xs text-white/30">Draws</p>
           </div>
           <div className="flex-1 text-center">
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <TeamLogo logo={awayTeam.logo} name={awayTeam.name} size="xs" />
-            </div>
+            <img src={awayTeam.logo} alt="" className="w-8 h-8 object-contain mx-auto mb-1" />
             <p className="text-2xl font-black text-white">{awayWins}</p>
-            <p className="text-xs text-white/30">Wins</p>
+            <p className="text-xs text-white/30">
+              {awayTeam.shortName || awayTeam.name}
+            </p>
           </div>
         </div>
         {/* Win bar */}
-        <div className="flex h-2 rounded-full overflow-hidden gap-0.5 mt-3">
-          <div className="rounded-full bg-violet-500" style={{ width: `${(homeWins / h2h.length) * 100}%` }} />
-          <div className="rounded-full bg-white/20" style={{ width: `${(draws / h2h.length) * 100}%` }} />
-          <div className="rounded-full bg-cyan-500" style={{ width: `${(awayWins / h2h.length) * 100}%` }} />
+        <div className="flex h-2 rounded-full overflow-hidden gap-0.5">
+          <div className="rounded-full bg-violet-500 transition-all duration-700"
+            style={{ width: `${(homeWins / h2h.length) * 100}%` }} />
+          <div className="rounded-full bg-white/20 transition-all duration-700"
+            style={{ width: `${(draws / h2h.length) * 100}%` }} />
+          <div className="rounded-full bg-cyan-500 transition-all duration-700"
+            style={{ width: `${(awayWins / h2h.length) * 100}%` }} />
+        </div>
+        <div className="flex justify-between mt-2">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-violet-500" />
+            <span className="text-xs text-white/30">{homeTeam.shortName || homeTeam.name}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-white/20" />
+            <span className="text-xs text-white/30">Draw</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-cyan-500" />
+            <span className="text-xs text-white/30">{awayTeam.shortName || awayTeam.name}</span>
+          </div>
         </div>
       </div>
 
@@ -356,10 +409,22 @@ function H2H({ h2h, homeTeam, awayTeam }) {
       <div className="space-y-2">
         {h2h.map((m, i) => {
           const dt = new Date(m.gameDate);
-          const isHomeTeamHome = m.homeTeamId !== homeTeam.id?.toString();
-          const [score1, score2] = (m.score || "0-0").split("-");
-          const homeScore = isHomeTeamHome ? score2 : score1;
-          const awayScore = isHomeTeamHome ? score1 : score2;
+          // Score is always from h2hTeam's perspective in the raw data
+          // homeTeamScore/awayTeamScore are absolute (home team = whoever was home)
+          const score1 = m.homeTeamScore || "0";
+          const score2 = m.awayTeamScore || "0";
+          // homeTeamId in H2H event = whoever was the home team that match
+          const matchHomeId = m.homeTeamId;
+          const ourHomeId = homeTeam.id;
+          // If home team in this match is our home team, show normally
+          // If not, flip
+          const displayHome = matchHomeId === ourHomeId;
+          const leftScore = displayHome ? score1 : score2;
+          const rightScore = displayHome ? score2 : score1;
+
+          // Result from home team's perspective
+          const homeWon = parseInt(leftScore) > parseInt(rightScore);
+          const awayWon = parseInt(rightScore) > parseInt(leftScore);
 
           return (
             <div key={m.id || i} className="glass-card rounded-xl px-4 py-3">
@@ -367,26 +432,30 @@ function H2H({ h2h, homeTeam, awayTeam }) {
                 <span className="text-xs text-white/25">
                   {dt.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
                 </span>
-                <span className="text-xs text-white/20 truncate max-w-32 text-right">
+                <span className="text-xs text-white/20 truncate max-w-36 text-right">
                   {m.leagueName || m.competitionName}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <img src={homeTeam.logo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />
-                  <span className="text-xs font-semibold text-white truncate">{homeTeam.shortName || homeTeam.name}</span>
+                  <span className="text-xs font-semibold text-white truncate">
+                    {homeTeam.shortName || homeTeam.name}
+                  </span>
                 </div>
-                <div className="flex items-center gap-2 px-3">
-                  <span className={`text-sm font-black tabular-nums ${
-                    parseInt(homeScore) > parseInt(awayScore) ? "text-white" : "text-white/40"
-                  }`}>{homeScore}</span>
+                <div className="flex items-center gap-2 px-3 flex-shrink-0">
+                  <span className={`text-sm font-black tabular-nums ${homeWon ? "text-white" : "text-white/40"}`}>
+                    {leftScore}
+                  </span>
                   <span className="text-white/20 text-xs">—</span>
-                  <span className={`text-sm font-black tabular-nums ${
-                    parseInt(awayScore) > parseInt(homeScore) ? "text-white" : "text-white/40"
-                  }`}>{awayScore}</span>
+                  <span className={`text-sm font-black tabular-nums ${awayWon ? "text-white" : "text-white/40"}`}>
+                    {rightScore}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-                  <span className="text-xs font-semibold text-white truncate">{awayTeam.shortName || awayTeam.name}</span>
+                  <span className="text-xs font-semibold text-white truncate">
+                    {awayTeam.shortName || awayTeam.name}
+                  </span>
                   <img src={awayTeam.logo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />
                 </div>
               </div>
@@ -400,11 +469,12 @@ function H2H({ h2h, homeTeam, awayTeam }) {
 
 // ── Team Leaders ───────────────────────────────────────
 
-function TeamLeaders({ leaders, homeTeam, awayTeam }) {
+function TeamLeaders({ leaders, homeTeam, awayTeam, homeTeamId, awayTeamId }) {
   const [activeTeam, setActiveTeam] = useState("home");
 
-  const homeLeaders = leaders?.find(l => l.teamId === homeTeam.id?.replace("s:600~t:", "")) || leaders?.[0];
-  const awayLeaders = leaders?.find(l => l.teamId !== homeTeam.id?.replace("s:600~t:", "")) || leaders?.[1];
+  // Match by exact team ID string
+  const homeLeaders = leaders?.find(l => l.teamId === homeTeamId);
+  const awayLeaders = leaders?.find(l => l.teamId === awayTeamId);
   const current = activeTeam === "home" ? homeLeaders : awayLeaders;
   const currentTeam = activeTeam === "home" ? homeTeam : awayTeam;
 
@@ -427,7 +497,7 @@ function TeamLeaders({ leaders, homeTeam, awayTeam }) {
             key={id}
             onClick={() => setActiveTeam(id)}
             className={`flex items-center gap-2 flex-1 px-3 py-2.5 rounded-xl transition-all ${
-              activeTeam === id ? "glass-strong" : "glass"
+              activeTeam === id ? "glass-strong ring-1 ring-violet-500/30" : "glass"
             }`}
           >
             <TeamLogo logo={team.logo} name={team.name} size="xs" />
@@ -450,7 +520,7 @@ function TeamLeaders({ leaders, homeTeam, awayTeam }) {
                 }`}>{i + 1}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-white truncate">{p.name}</p>
-                  <p className="text-xs text-white/30">{p.apps} appearances</p>
+                  <p className="text-xs text-white/30">{p.apps} apps</p>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-lg font-black text-white">{p.goals}</span>
@@ -474,7 +544,7 @@ function TeamLeaders({ leaders, homeTeam, awayTeam }) {
                 }`}>{i + 1}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-white truncate">{p.name}</p>
-                  <p className="text-xs text-white/30">{p.apps} appearances</p>
+                  <p className="text-xs text-white/30">{p.apps} apps</p>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-lg font-black text-white">{p.assists}</span>
@@ -485,13 +555,20 @@ function TeamLeaders({ leaders, homeTeam, awayTeam }) {
           </div>
         </div>
       )}
+
+      {!current?.goals?.length && !current?.assists?.length && (
+        <div className="text-center py-8">
+          <p className="text-3xl mb-2">👤</p>
+          <p className="text-sm text-white/30">No player stats for {currentTeam.name}</p>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── Mini Standings ─────────────────────────────────────
 
-function MiniStandings({ entries, homeTeamId, awayTeamId }) {
+function MiniStandings({ entries, homeTeamId, awayTeamId, leagueId, onSelectTeam }) {
   if (!entries?.length) return (
     <div className="text-center py-8">
       <p className="text-3xl mb-2">📊</p>
@@ -529,8 +606,15 @@ function MiniStandings({ entries, homeTeamId, awayTeamId }) {
           return (
             <div
               key={entry.id}
-              className={`flex items-center px-2 py-2 rounded-xl transition-all ${
-                isHighlighted ? "glass-strong ring-1 ring-violet-500/40" : "glass-card"
+              onClick={() => onSelectTeam?.({
+                id: entry.id,
+                displayName: entry.team,
+                logos: entry.logo ? [{ href: entry.logo[0]?.href }] : [],
+              }, leagueId)}
+              className={`flex items-center px-2 py-2 rounded-xl transition-all cursor-pointer active:scale-[0.99] ${
+                isHighlighted
+                  ? "glass-strong ring-1 ring-violet-500/40"
+                  : "glass-card hover:bg-white/5"
               }`}
             >
               <span className={`w-5 text-center text-xs font-black tabular-nums ${
@@ -571,13 +655,13 @@ function OddsCard({ odds, homeTeam, awayTeam }) {
         <p className="text-xs text-white/30 font-semibold uppercase tracking-widest">Match Odds</p>
         <span className="text-xs text-white/20">DraftKings</span>
       </div>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-2 mb-3">
         {[
           { label: homeTeam.shortName || homeTeam.name, val: odds.homeTeamOdds?.moneyLine, fav: odds.homeTeamOdds?.favorite },
           { label: "Draw", val: odds.drawOdds?.moneyLine, fav: false },
           { label: awayTeam.shortName || awayTeam.name, val: odds.awayTeamOdds?.moneyLine, fav: odds.awayTeamOdds?.favorite },
         ].map(o => (
-          <div key={o.label} className={`flex-1 text-center py-2.5 rounded-xl mx-1 ${o.fav ? "glass-strong ring-1 ring-violet-500/30" : "glass"}`}>
+          <div key={o.label} className={`flex-1 text-center py-2.5 rounded-xl ${o.fav ? "glass-strong ring-1 ring-violet-500/30" : "glass"}`}>
             <p className="text-xs text-white/30 truncate px-1">{o.label}</p>
             <p className={`text-base font-black mt-0.5 ${o.fav ? "text-violet-300" : "text-white"}`}>
               {o.val ? (o.val > 0 ? `+${o.val}` : o.val) : "—"}
@@ -600,7 +684,7 @@ function OddsCard({ odds, homeTeam, awayTeam }) {
 
 // ── Main Component ─────────────────────────────────────
 
-export default function MatchDetail({ game, onClose }) {
+export default function MatchDetail({ game, onClose, onSelectTeam }) {
   const [activeTab, setActiveTab] = useState("stats");
   const [visible, setVisible] = useState(false);
   const [details, setDetails] = useState(null);
@@ -617,10 +701,7 @@ export default function MatchDetail({ game, onClose }) {
 
   async function loadDetails() {
     const data = await fetchMatchDetails(game);
-    if (data) {
-      setDetails(data);
-      setSecondsAgo(0);
-    }
+    if (data) { setDetails(data); setSecondsAgo(0); }
     setLoadingDetails(false);
     setRefreshing(false);
   }
@@ -646,10 +727,24 @@ export default function MatchDetail({ game, onClose }) {
     setTimeout(onClose, 300);
   }
 
-  const stats = details?.stats || { possession: { home: 50, away: 50 }, shots: { home: 0, away: 0 }, shotsOnTarget: { home: 0, away: 0 }, corners: { home: 0, away: 0 }, fouls: { home: 0, away: 0 }, yellowCards: { home: 0, away: 0 }, offsides: { home: 0, away: 0 } };
+  const stats = details?.stats || {
+    possession: { home: 50, away: 50 }, shots: { home: 0, away: 0 },
+    shotsOnTarget: { home: 0, away: 0 }, corners: { home: 0, away: 0 },
+    fouls: { home: 0, away: 0 }, yellowCards: { home: 0, away: 0 }, offsides: { home: 0, away: 0 },
+  };
   const events = details?.events || game.events || [];
-  const venue = details?.venue || null;
-  const referee = details?.referee || null;
+
+  // Determine league ID from league name
+  const LEAGUE_MAP = {
+    "Premier League":   "eng.1",
+    "La Liga":          "esp.1",
+    "Bundesliga":       "ger.1",
+    "Serie A":          "ita.1",
+    "Ligue 1":          "fra.1",
+    "Champions League": "uefa.champions",
+    "Europa League":    "uefa.europa",
+  };
+  const leagueId = LEAGUE_MAP[game.league] || "eng.1";
 
   const tabs = [
     { id: "stats",    label: "Stats"    },
@@ -707,10 +802,7 @@ export default function MatchDetail({ game, onClose }) {
         </div>
         <div className="flex flex-col items-center gap-1.5 px-4">
           {isScheduled ? (
-            <>
-              <p className="text-xs text-white/30">Kick off</p>
-              <p className="text-3xl font-black text-white">{game.minute}</p>
-            </>
+            <><p className="text-xs text-white/30">Kick off</p><p className="text-3xl font-black text-white">{game.minute}</p></>
           ) : (
             <>
               <div className="flex items-center gap-3">
@@ -768,7 +860,6 @@ export default function MatchDetail({ game, onClose }) {
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto px-4 pb-8">
 
-        {/* Stats */}
         {activeTab === "stats" && (loadingDetails ? (
           <div className="space-y-4">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="glass rounded-xl h-10 animate-pulse" />)}</div>
         ) : (
@@ -788,61 +879,64 @@ export default function MatchDetail({ game, onClose }) {
           </>
         ))}
 
-        {/* Timeline */}
         {activeTab === "timeline" && (loadingDetails ? (
           <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="glass rounded-xl h-14 animate-pulse" />)}</div>
         ) : (
           <Timeline events={events} isLive={isLive} currentMinute={currentMinute} />
         ))}
 
-        {/* H2H */}
         {activeTab === "h2h" && (loadingDetails ? (
           <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="glass rounded-xl h-16 animate-pulse" />)}</div>
         ) : (
           <H2H h2h={details?.h2h || []} homeTeam={game.homeTeam} awayTeam={game.awayTeam} />
         ))}
 
-        {/* Players */}
         {activeTab === "players" && (loadingDetails ? (
           <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="glass rounded-xl h-14 animate-pulse" />)}</div>
         ) : (
-          <TeamLeaders leaders={details?.leaders || []} homeTeam={game.homeTeam} awayTeam={game.awayTeam} />
+          <TeamLeaders
+            leaders={details?.leaders || []}
+            homeTeam={game.homeTeam}
+            awayTeam={game.awayTeam}
+            homeTeamId={details?.homeTeamId}
+            awayTeamId={details?.awayTeamId}
+          />
         ))}
 
-        {/* Table */}
         {activeTab === "table" && (loadingDetails ? (
           <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="glass rounded-xl h-10 animate-pulse" />)}</div>
         ) : (
           <MiniStandings
             entries={details?.standingsEntries || []}
-            homeTeamId={game.homeTeam.id}
-            awayTeamId={game.awayTeam.id}
+            homeTeamId={details?.homeTeamId || game.homeTeam.id}
+            awayTeamId={details?.awayTeamId || game.awayTeam.id}
+            leagueId={leagueId}
+            onSelectTeam={onSelectTeam}
           />
         ))}
 
-        {/* Info */}
         {activeTab === "info" && (
           <div className="space-y-3">
             <div className="glass-card rounded-2xl p-4 space-y-4">
-              {venue && (
+              {details?.venue && (
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 glass-strong rounded-lg flex items-center justify-center flex-shrink-0">
                     <MapPin size={14} className="text-white/40" />
                   </div>
                   <div>
                     <p className="text-xs text-white/30">Venue</p>
-                    <p className="text-sm font-semibold text-white">{venue}</p>
+                    <p className="text-sm font-semibold text-white">{details.venue}</p>
                   </div>
                 </div>
               )}
-              {referee && (
+              {details?.referee && (
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 glass-strong rounded-lg flex items-center justify-center flex-shrink-0">
                     <User size={14} className="text-white/40" />
                   </div>
                   <div>
                     <p className="text-xs text-white/30">Referee</p>
-                    <p className="text-sm font-semibold text-white">{referee}</p>
+                    <p className="text-sm font-semibold text-white">{details.referee}</p>
                   </div>
                 </div>
               )}
@@ -857,26 +951,9 @@ export default function MatchDetail({ game, onClose }) {
                   </div>
                 </div>
               )}
-              {!venue && !referee && <p className="text-center text-xs text-white/20 py-4">Match info not available</p>}
-            </div>
-            <div className="glass-card rounded-2xl p-4">
-              <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">Teams</p>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <TeamLogo logo={game.homeTeam.logo} name={game.homeTeam.name} size="sm" />
-                  <div>
-                    <p className="text-sm font-bold text-white">{game.homeTeam.name}</p>
-                    <p className="text-xs text-white/30">Home</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-white">{game.awayTeam.name}</p>
-                    <p className="text-xs text-white/30">Away</p>
-                  </div>
-                  <TeamLogo logo={game.awayTeam.logo} name={game.awayTeam.name} size="sm" />
-                </div>
-              </div>
+              {!details?.venue && !details?.referee && (
+                <p className="text-center text-xs text-white/20 py-4">Match info not available</p>
+              )}
             </div>
           </div>
         )}
