@@ -143,7 +143,7 @@ export default function App() {
       /* Favourites tab */
       ) : isFavouritesTab ? (
         <div className="px-4 pb-8">
-          <FavouritesTab allGames={games} onPress={setSelectedGame} />
+          <FavouritesTab allGames={games} onPress={handleMatchPress} />
         </div>
 
       /* All other sports including soccer */
@@ -205,7 +205,7 @@ export default function App() {
                     index={i}
                     highlighted={game.id === highlightedGame}
                     showLeague={false}
-                    onPress={setSelectedGame}
+                    onPress={handleMatchPress}
                   />
                 ))}
               </div>

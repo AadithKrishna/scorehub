@@ -476,8 +476,8 @@ function TeamLeaders({ leaders, homeTeam, awayTeam, homeTeamId, awayTeamId }) {
   const [activeTeam, setActiveTeam] = useState("home");
 
   // Match by exact team ID string
-  const homeLeaders = leaders?.find(l => l.teamId === homeTeamId);
-  const awayLeaders = leaders?.find(l => l.teamId === awayTeamId);
+  const homeLeaders = leaders?.find(l => l.teamId === homeTeamId) || leaders?.[0];
+  const awayLeaders = leaders?.find(l => l.teamId === awayTeamId) || leaders?.[1];  
   const current = activeTeam === "home" ? homeLeaders : awayLeaders;
   const currentTeam = activeTeam === "home" ? homeTeam : awayTeam;
 
