@@ -341,7 +341,7 @@ function LeagueNews({ leagueId }) {
   return (
     <div className="space-y-3">
       {news.map((article, i) => (
-        
+        <a
           key={i}
           href={article.links?.web?.href || "#"}
           target="_blank"
