@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import PlayerDetail from "./PlayerDetail";
+import { trackLeagueOpen } from "../analytics";
 
 
 const ESPN = "https://site.api.espn.com/apis/site/v2/sports/soccer";
@@ -387,6 +388,7 @@ export default function LeagueDetail({ leagueId, leagueName, leagueFlag, leagueC
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 10);
+    trackLeagueOpen(leagueName);
   }, []);
 
   function handleClose() {

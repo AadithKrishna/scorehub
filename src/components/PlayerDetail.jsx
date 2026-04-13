@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { trackPlayerOpen } from "../analytics";
+
 
 function StatCard({ value, label, color, icon }) {
   return (
@@ -16,6 +18,7 @@ export default function PlayerDetail({ player, onClose }) {
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 10);
+    trackPlayerOpen(player.name, player.teamName);
   }, []);
 
   function handleClose() {
