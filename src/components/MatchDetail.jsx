@@ -75,21 +75,52 @@ async function fetchMatchDetails(game) {
     };
 
     // ── Leaders — keyed by exact team ID ────────────
-    const leaders = (data.leaders || []).map(teamLeaders => ({
-      teamId: teamLeaders.team?.id,
-      teamName: teamLeaders.team?.displayName,
-      teamLogo: teamLeaders.team?.logo,
-      goals: teamLeaders.leaders?.find(l => l.name === "goalsLeaders")?.leaders?.slice(0, 3).map(l => ({
-        name: l.athlete?.displayName,
-        goals: l.statistics?.find(s => s.name === "totalGoals")?.value || 0,
-        apps: l.statistics?.find(s => s.name === "appearances")?.value || 0,
-      })) || [],
-      assists: teamLeaders.leaders?.find(l => l.name === "assistsLeaders")?.leaders?.slice(0, 3).map(l => ({
-        name: l.athlete?.displayName,
-        assists: l.mainStat?.value || 0,
-        apps: l.statistics?.find(s => s.name === "appearances")?.value || 0,
-      })) || [],
-    }));
+    // ── Leaders from team rosters ────────────────────
+const leagueSlug = game.league === "Premier League" ? "eng.1" :
+  game.league === "La Liga" ? "esp.1" :
+  game.league === "Bundesliga" ? "ger.1" :
+  game.league === "Serie A" ? "ita.1" :
+  game.league === "Ligue 1" ? "fra.1" :
+  game.league === "Champions League" ? "uefa.champions" :
+  game.league === "Europa League" ? "uefa.europa" : "eng.1";
+
+const [homeRoster, awayRoster] = await Promise.allSettled([
+  fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueSlug}/teams/${homeTeamId}/roster`).then(r => r.json()),
+  fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueSlug}/teams/${awayTeamId}/roster`).then(r => r.json()),
+]);
+
+const extractLeaders = (rosterData) => {
+  if (!rosterData?.athletes) return { goals: [], assists: [] };
+  const players = rosterData.athletes.map(p => {
+    const off = p.statistics?.splits?.categories?.find(c => c.name === "offensive")?.stats || [];
+    const gen = p.statistics?.splits?.categories?.find(c => c.name === "general")?.stats || [];
+    return {
+      name: p.displayName,
+      goals:   off.find(s => s.name === "totalGoals")?.value || 0,
+      assists: off.find(s => s.name === "goalAssists")?.value || 0,
+      apps:    gen.find(s => s.name === "appearances")?.value || 0,
+    };
+  });
+  return {
+    goals:   players.filter(p => p.goals > 0).sort((a, b) => b.goals - a.goals).slice(0, 3),
+    assists: players.filter(p => p.assists > 0).sort((a, b) => b.assists - a.assists).slice(0, 3),
+  };
+};
+
+const leaders = [
+  {
+    teamId: homeTeamId,
+    teamName: homeComp?.team?.displayName,
+    teamLogo: homeComp?.team?.logo,
+    ...extractLeaders(homeRoster.status === "fulfilled" ? homeRoster.value : null),
+  },
+  {
+    teamId: awayTeamId,
+    teamName: awayComp?.team?.displayName,
+    teamLogo: awayComp?.team?.logo,
+    ...extractLeaders(awayRoster.status === "fulfilled" ? awayRoster.value : null),
+  },
+];
 
     // ── H2H — only one team's perspective returned ──
     // gameResult is from that team's POV: W=they won, L=they lost, D=draw
@@ -1017,7 +1048,9 @@ export default function MatchDetail({ game, onClose, onSelectTeam }) {
 
   async function loadDetails() {
     const data = await fetchMatchDetails(game);
-    if (data) { setDetails(data); setSecondsAgo(0); }
+    if (data) {
+    console.log("leaders:", JSON.stringify(data.leaders?.map(l => ({teamId: l.teamId, goals: l.goals?.length, assists: l.assists?.length}))));
+    setDetails(data); setSecondsAgo(0); }
     setLoadingDetails(false);
     setRefreshing(false);
   }
