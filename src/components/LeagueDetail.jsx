@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import PlayerDetail from "./PlayerDetail";
+
 
 const ESPN = "https://site.api.espn.com/apis/site/v2/sports/soccer";
 const ESPN_V2 = "https://site.api.espn.com/apis/v2/sports/soccer";
@@ -119,7 +121,7 @@ function LeagueStandings({ leagueId, onSelectTeam }) {
   );
 }
 
-function TopScorers({ leagueId }) {
+function TopScorers({ leagueId, onSelectPlayer }) {
   const [scorers, setScorers] = useState([]);
   const [assisters, setAssisters] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -164,9 +166,40 @@ function TopScorers({ leagueId }) {
             const assists = getStat("goalAssists");
             const shots = getStat("totalShots");
             const shotsOnTarget = getStat("shotsOnTarget");
-            const general = player.statistics?.splits?.categories
-              ?.find(c => c.name === "general")?.stats || [];
             const apps = general.find(s => s.name === "appearances")?.value || 0;
+            const general = player.statistics?.splits?.categories
+                ?.find(c => c.name === "general")?.stats || [];
+            const gk = player.statistics?.splits?.categories
+                ?.find(c => c.name === "goalKeeping")?.stats || [];
+            const getGen = name => general.find(s => s.name === name)?.value || 0;
+            const getGK = name => gk.find(s => s.name === name)?.value || 0;
+
+if (goals > 0 || assists > 0 || getGK("saves") > 0) {
+  allPlayers.push({
+    id: player.id,
+    name: player.displayName,
+    shortName: player.shortName,
+    nationality: player.citizenship,
+    flag: player.flag?.href,
+    position: player.position?.abbreviation,
+    jersey: player.jersey,
+    teamName,
+    teamLogo,
+    teamColor: `#${teamColor}`,
+    goals,
+    assists,
+    shots,
+    shotsOnTarget,
+    apps: getGen("appearances"),
+    yellowCards: getGen("yellowCards"),
+    redCards: getGen("redCards"),
+    foulsCommitted: getGen("foulsCommitted"),
+    foulsSuffered: getGen("foulsSuffered"),
+    saves: getGK("saves"),
+    shotsFaced: getGK("shotsFaced"),
+    goalsConceded: getGK("goalsConceded"),
+  });
+}
 
             if (goals > 0 || assists > 0) {
               allPlayers.push({
@@ -254,8 +287,11 @@ function TopScorers({ leagueId }) {
 
       <div className="space-y-2">
         {list.map((p, i) => (
-          <div key={p.id}
-            className="glass-card rounded-xl px-4 py-2.5 flex items-center gap-3">
+          <div
+            key={p.id}
+        onClick={() => onSelectPlayer?.(p)}
+            className="glass-card rounded-xl px-4 py-2.5 flex items-center gap-3 cursor-pointer active:scale-[0.99] hover:bg-white/5 transition-all"
+>
             {/* Rank */}
             <span className={`text-sm font-black w-6 text-center flex-shrink-0 ${
               i === 0 ? "text-yellow-400" :
@@ -379,6 +415,7 @@ function LeagueNews({ leagueId }) {
 export default function LeagueDetail({ leagueId, leagueName, leagueFlag, leagueColor, onSelectTeam, onClose }) {
   const [visible, setVisible] = useState(false);
   const [activeTab, setActiveTab] = useState("standings");
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 10);
@@ -405,6 +442,13 @@ export default function LeagueDetail({ leagueId, leagueName, leagueFlag, leagueC
         transition: "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)",
       }}
     >
+      {selectedPlayer && (
+        <PlayerDetail
+          player={selectedPlayer}
+          onClose={() => setSelectedPlayer(null)}
+        />
+      )}
+    
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-12 pb-4">
         <div className="flex items-center gap-3">
@@ -463,7 +507,10 @@ export default function LeagueDetail({ leagueId, leagueName, leagueFlag, leagueC
           />
         )}
         {activeTab === "scorers" && (
-          <TopScorers leagueId={leagueId} />
+            <TopScorers
+            leagueId={leagueId}
+            onSelectPlayer={setSelectedPlayer}
+            />
         )}
         {activeTab === "news" && (
           <LeagueNews leagueId={leagueId} />
