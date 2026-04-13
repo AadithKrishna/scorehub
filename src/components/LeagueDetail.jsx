@@ -121,82 +121,6 @@ function LeagueStandings({ leagueId, onSelectTeam }) {
 
 function TopScorers({ leagueId }) {
   const [scorers, setScorers] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch(`${ESPN}/${leagueId}/scoreboard`)
-      .then(r => r.json())
-      .then(d => {
-        const map = {};
-        (d.events || []).forEach(event => {
-          event.competitions?.[0]?.competitors?.forEach(comp => {
-            comp.leaders?.forEach(leader => {
-              if (leader.name === "goals") {
-                leader.leaders?.forEach(l => {
-                  const id = l.athlete?.id;
-                  if (!id || map[id]) return;
-                  map[id] = {
-                    name: l.athlete?.displayName,
-                    goals: l.value,
-                    team: comp.team?.displayName,
-                    logo: comp.team?.logo,
-                  };
-                });
-              }
-            });
-          });
-        });
-        setScorers(Object.values(map).sort((a, b) => b.goals - a.goals));
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [leagueId]);
-
-  if (loading) return (
-    <div className="space-y-2">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="glass rounded-xl h-14 animate-pulse" />
-      ))}
-    </div>
-  );
-
-  if (!scorers.length) return (
-    <div className="text-center py-8">
-      <p className="text-3xl mb-2">⚽</p>
-      <p className="text-sm text-white/30">No scorer data available</p>
-    </div>
-  );
-
-  return (
-    <div className="space-y-2">
-      {scorers.slice(0, 20).map((s, i) => (
-        <div key={s.name + i} className="glass-card rounded-xl px-4 py-2.5 flex items-center gap-3">
-          <span className={`text-sm font-black w-5 text-center ${
-            i === 0 ? "text-yellow-400" :
-            i === 1 ? "text-slate-300" :
-            i === 2 ? "text-amber-600" : "text-white/30"
-          }`}>
-            {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
-          </span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-white truncate">{s.name}</p>
-            <div className="flex items-center gap-2 mt-0.5">
-              {s.logo && <img src={s.logo} alt="" className="w-3.5 h-3.5 object-contain" />}
-              <p className="text-xs text-white/35 truncate">{s.team}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xl font-black text-white">{s.goals}</span>
-            <span className="text-xs text-white/30">⚽</span>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function TopScorers({ leagueId }) {
-  const [scorers, setScorers] = useState([]);
   const [assisters, setAssisters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("goals");
@@ -381,6 +305,73 @@ function TopScorers({ leagueId }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function LeagueNews({ leagueId }) {
+  const [news, setNews] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`${ESPN}/${leagueId}/news`)
+      .then(r => r.json())
+      .then(d => {
+        setNews(d.articles?.slice(0, 10) || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [leagueId]);
+
+  if (loading) return (
+    <div className="space-y-3">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="glass rounded-xl h-20 animate-pulse" />
+      ))}
+    </div>
+  );
+
+  if (!news.length) return (
+    <div className="text-center py-8">
+      <p className="text-3xl mb-2">📰</p>
+      <p className="text-sm text-white/30">No news available</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      {news.map((article, i) => (
+        
+          key={i}
+          href={article.links?.web?.href || "#"}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="glass-card rounded-xl overflow-hidden flex gap-3 active:scale-[0.99] transition-all cursor-pointer"
+        >
+          {article.images?.[0]?.url && (
+            <img
+              src={article.images[0].url}
+              alt=""
+              className="w-24 h-20 object-cover flex-shrink-0"
+            />
+          )}
+          <div className="flex-1 min-w-0 py-2 pr-3">
+            <p className="text-xs font-black text-white line-clamp-2 leading-tight">
+              {article.headline}
+            </p>
+            <p className="text-xs text-white/30 mt-1 line-clamp-2 leading-relaxed">
+              {article.description}
+            </p>
+            <p className="text-xs text-white/20 mt-1.5">
+              {article.published
+                ? new Date(article.published).toLocaleDateString(undefined, {
+                    day: "numeric", month: "short",
+                  })
+                : ""}
+            </p>
+          </div>
+        </a>
+      ))}
     </div>
   );
 }
