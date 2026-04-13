@@ -15,6 +15,8 @@ import TeamDetail from "./components/TeamDetail";
 import { SPORTS, MOTORSPORT_IDS } from "./data/mockData";
 import { useGames } from "./hooks/useGames";
 import useUserStore from "./store/userStore";
+import { trackSportView, trackMatchOpen } from "./analytics";
+
 
 const ALL_TABS = [
   { id: "favourites", label: "Favourites", icon: "⭐" },
@@ -30,8 +32,12 @@ export default function App() {
   const [selectedGame, setSelectedGame] = useState(null);
   const [selectedLeague, setSelectedLeague] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
-
   const { loadFavorites, loadRecentSearches } = useUserStore();
+
+  function handleMatchPress(game) {
+  setSelectedGame(game);
+  trackMatchOpen(game.homeTeam?.name, game.awayTeam?.name, game.league);
+}
 
   useEffect(() => {
     loadFavorites();
@@ -60,13 +66,14 @@ export default function App() {
   const liveCount = games.filter((g) => g.status === "live").length;
 
   function handleSportChange(sport) {
-    setActiveSport(sport);
-    setFilter("all");
-    setActiveLeague("all");
-    setHighlightedGame(null);
-    setSelectedLeague(null);
-    setSelectedTeam(null);
-  }
+  setActiveSport(sport);
+  setFilter("all");
+  setActiveLeague("all");
+  setHighlightedGame(null);
+  setSelectedLeague(null);
+  setSelectedTeam(null);
+  trackSportView(sport);
+}
 
   function handleSelectGame(game) {
     setActiveSport(game.sport);
