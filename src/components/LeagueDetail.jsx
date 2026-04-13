@@ -195,69 +195,192 @@ function TopScorers({ leagueId }) {
   );
 }
 
-function LeagueNews({ leagueId }) {
-  const [news, setNews] = useState([]);
+function TopScorers({ leagueId }) {
+  const [scorers, setScorers] = useState([]);
+  const [assisters, setAssisters] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("goals");
 
   useEffect(() => {
-    fetch(`${ESPN}/${leagueId}/news`)
-      .then(r => r.json())
-      .then(d => {
-        setNews(d.articles?.slice(0, 10) || []);
+    async function load() {
+      try {
+        // Step 1: Get all team IDs from standings
+        const standingsRes = await fetch(
+          `https://site.api.espn.com/apis/v2/sports/soccer/${leagueId}/standings`
+        );
+        const standingsData = await standingsRes.json();
+        const teamIds = standingsData.children?.[0]?.standings?.entries
+          ?.map(e => e.team?.id)
+          .filter(Boolean) || [];
+
+        if (!teamIds.length) throw new Error("No teams found");
+
+        // Step 2: Fetch all rosters in parallel
+        const rosterResults = await Promise.allSettled(
+          teamIds.map(id =>
+            fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueId}/teams/${id}/roster`)
+              .then(r => r.json())
+          )
+        );
+
+        // Step 3: Extract player stats
+        const allPlayers = [];
+        rosterResults.forEach(result => {
+          if (result.status !== "fulfilled") return;
+          const athletes = result.value.athletes || [];
+          const teamName = result.value.team?.displayName || "";
+          const teamLogo = result.value.team?.logo || "";
+          const teamColor = result.value.team?.color || "8b5cf6";
+
+          athletes.forEach(player => {
+            const offensive = player.statistics?.splits?.categories
+              ?.find(c => c.name === "offensive")?.stats || [];
+            const getStat = name => offensive.find(s => s.name === name)?.value || 0;
+            const goals = getStat("totalGoals");
+            const assists = getStat("goalAssists");
+            const shots = getStat("totalShots");
+            const shotsOnTarget = getStat("shotsOnTarget");
+            const general = player.statistics?.splits?.categories
+              ?.find(c => c.name === "general")?.stats || [];
+            const apps = general.find(s => s.name === "appearances")?.value || 0;
+
+            if (goals > 0 || assists > 0) {
+              allPlayers.push({
+                id: player.id,
+                name: player.displayName,
+                shortName: player.shortName,
+                nationality: player.citizenship,
+                flag: player.flag?.href,
+                position: player.position?.abbreviation,
+                jersey: player.jersey,
+                teamName,
+                teamLogo,
+                teamColor: `#${teamColor}`,
+                goals,
+                assists,
+                shots,
+                shotsOnTarget,
+                apps,
+              });
+            }
+          });
+        });
+
+        // Sort by goals and assists
+        const byGoals = [...allPlayers].sort((a, b) =>
+          b.goals !== a.goals ? b.goals - a.goals : b.assists - a.assists
+        );
+        const byAssists = [...allPlayers].sort((a, b) =>
+          b.assists !== a.assists ? b.assists - a.assists : b.goals - a.goals
+        );
+
+        setScorers(byGoals.slice(0, 20));
+        setAssisters(byAssists.slice(0, 20));
         setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      } catch (err) {
+        console.warn("Failed to load scorers:", err.message);
+        setLoading(false);
+      }
+    }
+    load();
   }, [leagueId]);
 
   if (loading) return (
-    <div className="space-y-3">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="glass rounded-xl h-20 animate-pulse" />
+    <div className="space-y-2">
+      <div className="glass rounded-xl h-10 animate-pulse mb-4" />
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="glass rounded-xl h-14 animate-pulse"
+          style={{ animationDelay: `${i * 50}ms` }} />
       ))}
     </div>
   );
 
-  if (!news.length) return (
+  if (!scorers.length) return (
     <div className="text-center py-8">
-      <p className="text-3xl mb-2">📰</p>
-      <p className="text-sm text-white/30">No news available</p>
+      <p className="text-3xl mb-2">⚽</p>
+      <p className="text-sm text-white/30">No scorer data available</p>
     </div>
   );
+
+  const list = activeTab === "goals" ? scorers : assisters;
+  const statKey = activeTab === "goals" ? "goals" : "assists";
+  const statIcon = activeTab === "goals" ? "⚽" : "🎯";
 
   return (
-    <div className="space-y-3">
-      {news.map((article, i) => (
-         <a
-          key={i}
-          href={article.links?.web?.href || "#"}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="glass-card rounded-xl overflow-hidden flex gap-3 active:scale-[0.99] transition-all cursor-pointer"
-        >
-          {article.images?.[0]?.url && (
-            <img
-              src={article.images[0].url}
-              alt=""
-              className="w-24 h-20 object-cover flex-shrink-0"
-            />
-          )}
-          <div className="flex-1 min-w-0 py-2 pr-3">
-            <p className="text-xs font-black text-white line-clamp-2 leading-tight">
-              {article.headline}
-            </p>
-            <p className="text-xs text-white/30 mt-1 line-clamp-2 leading-relaxed">
-              {article.description}
-            </p>
-            <p className="text-xs text-white/20 mt-1.5">
-              {article.published
-                ? new Date(article.published).toLocaleDateString(undefined, {
-                    day: "numeric", month: "short",
-                  })
-                : ""}
-            </p>
+    <div>
+      {/* Toggle */}
+      <div className="flex gap-1 mb-4 glass rounded-xl p-1">
+        {[
+          { id: "goals",   label: "⚽ Top Scorers"  },
+          { id: "assists", label: "🎯 Top Assisters" },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${
+              activeTab === tab.id
+                ? "bg-violet-600 text-white"
+                : "text-white/40 hover:text-white/70"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-2">
+        {list.map((p, i) => (
+          <div key={p.id}
+            className="glass-card rounded-xl px-4 py-2.5 flex items-center gap-3">
+            {/* Rank */}
+            <span className={`text-sm font-black w-6 text-center flex-shrink-0 ${
+              i === 0 ? "text-yellow-400" :
+              i === 1 ? "text-slate-300" :
+              i === 2 ? "text-amber-600" :
+              "text-white/30"
+            }`}>
+              {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
+            </span>
+
+            {/* Player info */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                {p.flag && (
+                  <img src={p.flag} alt="" className="w-3.5 h-3.5 object-contain flex-shrink-0" />
+                )}
+                <p className="text-sm font-bold text-white truncate">{p.name}</p>
+              </div>
+              <div className="flex items-center gap-2 mt-0.5">
+                {p.teamLogo && (
+                  <img src={p.teamLogo} alt="" className="w-3.5 h-3.5 object-contain flex-shrink-0" />
+                )}
+                <p className="text-xs text-white/35 truncate">{p.teamName}</p>
+                <span className="text-xs text-white/20">· {p.apps} apps</span>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <div className="text-center">
+                <p className="text-lg font-black text-white">{p[statKey]}</p>
+                <p className="text-xs text-white/25">{statIcon}</p>
+              </div>
+              {activeTab === "goals" && p.assists > 0 && (
+                <div className="text-center">
+                  <p className="text-sm font-bold text-white/40">{p.assists}</p>
+                  <p className="text-xs text-white/20">🎯</p>
+                </div>
+              )}
+              {activeTab === "assists" && p.goals > 0 && (
+                <div className="text-center">
+                  <p className="text-sm font-bold text-white/40">{p.goals}</p>
+                  <p className="text-xs text-white/20">⚽</p>
+                </div>
+              )}
+            </div>
           </div>
-        </a>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
