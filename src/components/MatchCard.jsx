@@ -29,7 +29,9 @@ function TeamLogo({ logo, name }) {
 
   if (isUrl) {
     return (
-      <div className="w-10 h-10 rounded-xl glass-strong flex items-center justify-center flex-shrink-0 overflow-hidden p-1">
+      <div className="w-8 h-8 rounded-lg glass-strong flex items-center justify-center flex-shrink-0 overflow-hidden p-1">
+
+
         <img
           src={logo}
           alt={name}
@@ -46,7 +48,7 @@ function TeamLogo({ logo, name }) {
 
   if (isEmoji) {
     return (
-      <div className="w-10 h-10 rounded-xl glass-strong flex items-center justify-center flex-shrink-0">
+      <div className="w-8 h-8 rounded-xl glass-strong flex items-center justify-center flex-shrink-0">
         <span className="text-lg">{logo}</span>
       </div>
     );
@@ -54,7 +56,7 @@ function TeamLogo({ logo, name }) {
 
   return (
     <div
-      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+      className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
       style={{
         background: `linear-gradient(135deg, ${bg}25, ${bg}10)`,
         border: `1px solid ${bg}40`,
@@ -106,12 +108,12 @@ function ScoreDisplay({ homeScore, awayScore, isFinished, isScheduled }) {
   return (
     <div className="flex flex-col items-center gap-0.5">
       <div className="flex items-center gap-2">
-        <span className={`text-2xl font-black tabular-nums tracking-tight
+        <span className={`text-lg font-black tabular-nums tracking-tight
           ${homeWin ? "score-glow text-white" : "text-white/40"}`}>
           {homeScore ?? 0}
         </span>
         <span className="text-white/15 text-sm">—</span>
-        <span className={`text-2xl font-black tabular-nums tracking-tight
+        <span className={`text-lg font-black tabular-nums tracking-tight
           ${awayWin ? "score-glow text-white" : "text-white/40"}`}>
           {awayScore ?? 0}
         </span>
@@ -181,7 +183,7 @@ export default function MatchCard({
       onMouseLeave={() => setPressed(false)}
       onClick={() => onPress?.(game)}
       style={{ animationDelay: `${index * 40}ms` }}
-      className={`glass-card card-hover rounded-xl px-3 py-2.5 cursor-pointer
+      className={`glass-card card-hover rounded-xl px-3 py-2 cursor-pointer
         ${pressed ? "scale-[0.99] opacity-80" : ""}
         ${highlighted ? "ring-2 ring-violet-500/70" : ""}
         transition-all duration-150

@@ -15,14 +15,17 @@ const ENDPOINTS = {
   f1: `${ESPN}/racing/f1/scoreboard`,
 };
 
-const TTL = 60_000;
+const TTL = 5 * 60_000;
+const CRICKET_TTL = 10 * 60_000; // 10 minutes for cricket to save API calls
+
 
 function getCached(sport) {
   try {
     const raw = localStorage.getItem(`scorehub_${sport}`);
     if (!raw) return null;
     const { data, time } = JSON.parse(raw);
-    if (Date.now() - time < TTL) return data;
+    const ttl = sport === "cricket" ? CRICKET_TTL : TTL;
+    if (Date.now() - time < ttl) return data;
     return null;
   } catch {
     return null;
