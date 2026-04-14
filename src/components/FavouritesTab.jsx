@@ -94,6 +94,166 @@ async function searchMotoGPRiders(query) {
     }));
 }
 
+async function fetchNextEvent(fav) {
+  try {
+    if (fav.sport === "soccer" && fav.id && fav.leagueId) {
+      const res = await fetch(
+        `https://site.api.espn.com/apis/site/v2/sports/soccer/${fav.leagueId}/teams/${fav.id}`
+      );
+      const data = await res.json();
+      const next = data.team?.nextEvent?.[0];
+      if (!next) return null;
+      const comp = next.competitions?.[0];
+      const home = comp?.competitors?.find(c => c.homeAway === "home");
+      const away = comp?.competitors?.find(c => c.homeAway === "away");
+      const odds = comp?.odds?.[0];
+      return {
+        type: "soccer",
+        title: next.shortName,
+        date: new Date(next.date),
+        venue: comp?.venue?.fullName,
+        homeName: home?.team?.shortDisplayName,
+        homeLogo: home?.team?.logos?.[0]?.href,
+        awayName: away?.team?.shortDisplayName,
+        awayLogo: away?.team?.logos?.[0]?.href,
+        homeOdds: odds?.homeTeamOdds?.moneyLine,
+        awayOdds: odds?.awayTeamOdds?.moneyLine,
+        drawOdds: odds?.drawOdds?.moneyLine,
+      };
+    }
+
+    if (fav.sport === "f1") {
+      const res = await fetch("https://api.jolpi.ca/ergast/f1/2026.json");
+      const data = await res.json();
+      const races = data.MRData?.RaceTable?.Races || [];
+      const next = races.find(r => new Date(r.date) > new Date());
+      if (!next) return null;
+      return {
+        type: "f1",
+        title: next.raceName,
+        date: new Date(next.date),
+        circuit: next.Circuit?.circuitName,
+        country: next.Circuit?.Location?.country,
+        round: next.round,
+      };
+    }
+
+    if (fav.sport === "motogp") {
+      const res = await fetch(`/api/motogp?path=events?seasonYear=2026&isFinished=false`);
+      const data = await res.json();
+      const events = Array.isArray(data) ? data : [];
+      const next = events
+        .filter(e => e.test === false)
+        .sort((a, b) => new Date(a.date_start) - new Date(b.date_start))
+        .find(e => new Date(e.date_end) > new Date());
+      if (!next) return null;
+      return {
+        type: "motogp",
+        title: next.name,
+        date: new Date(next.date_start),
+        country: next.country?.name,
+        circuit: next.circuit?.name,
+      };
+    }
+  } catch (err) {
+    console.warn("fetchNextEvent error:", err.message);
+  }
+  return null;
+}
+
+function NextEventCard({ fav }) {
+  const [nextEvent, setNextEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchNextEvent(fav).then(e => {
+      setNextEvent(e);
+      setLoading(false);
+    });
+  }, [fav.id]);
+
+  if (loading) return (
+    <div className="glass rounded-xl h-20 animate-pulse" />
+  );
+
+  if (!nextEvent) return null;
+
+  const dateStr = nextEvent.date.toLocaleDateString(undefined, {
+    weekday: "short", day: "numeric", month: "short"
+  });
+  const timeStr = nextEvent.date.toLocaleTimeString(undefined, {
+    hour: "2-digit", minute: "2-digit"
+  });
+
+  return (
+    <div className="glass-card rounded-2xl p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xs">
+          {nextEvent.type === "f1" ? "🏎️" : nextEvent.type === "motogp" ? "🏍️" : "📅"}
+        </span>
+        <p className="text-xs text-white/30 font-semibold uppercase tracking-widest">Next Match</p>
+        <div className="ml-auto glass px-2 py-0.5 rounded-full">
+          <span className="text-xs text-white/40">{dateStr}</span>
+        </div>
+      </div>
+
+      {nextEvent.type === "soccer" && (
+        <>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-col items-center gap-1.5 flex-1">
+              <img src={nextEvent.homeLogo} alt="" className="w-10 h-10 object-contain" />
+              <p className="text-xs font-bold text-white text-center">{nextEvent.homeName}</p>
+            </div>
+            <div className="flex flex-col items-center px-3">
+              <p className="text-xs text-white/30">vs</p>
+              <p className="text-xs font-bold text-white/60 mt-1">{timeStr}</p>
+            </div>
+            <div className="flex flex-col items-center gap-1.5 flex-1">
+              <img src={nextEvent.awayLogo} alt="" className="w-10 h-10 object-contain" />
+              <p className="text-xs font-bold text-white text-center">{nextEvent.awayName}</p>
+            </div>
+          </div>
+          {nextEvent.venue && (
+            <p className="text-xs text-white/25 text-center mb-2">📍 {nextEvent.venue}</p>
+          )}
+          {nextEvent.homeOdds && (
+            <div className="flex items-center justify-between glass rounded-xl px-3 py-2">
+              {[
+                { label: nextEvent.homeName, val: nextEvent.homeOdds },
+                { label: "Draw", val: nextEvent.drawOdds },
+                { label: nextEvent.awayName, val: nextEvent.awayOdds },
+              ].map(o => (
+                <div key={o.label} className="text-center flex-1">
+                  <p className="text-xs text-white/30 truncate px-1">{o.label}</p>
+                  <p className="text-sm font-black text-white">
+                    {o.val ? (o.val > 0 ? `+${o.val}` : o.val) : "—"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {(nextEvent.type === "f1" || nextEvent.type === "motogp") && (
+        <>
+          <p className="text-base font-black text-white mb-1">{nextEvent.title}</p>
+          {nextEvent.circuit && (
+            <p className="text-xs text-white/40 mb-1">🏁 {nextEvent.circuit}</p>
+          )}
+          {nextEvent.country && (
+            <p className="text-xs text-white/30">📍 {nextEvent.country}</p>
+          )}
+          <p className="text-xs text-white/50 font-semibold mt-2">{timeStr}</p>
+          {nextEvent.round && (
+            <p className="text-xs text-white/20 mt-0.5">Round {nextEvent.round}</p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function SportBadge({ sport }) {
   const map = {
     soccer: { label: "Football", color: "#10b981" },
@@ -382,14 +542,27 @@ export default function FavouritesTab({ allGames, onPress }) {
         </div>
       )}
 
-      {/* No matches today */}
-      {favorites.length > 0 && favGames.length === 0 && (
-        <div className="text-center py-8 mb-6">
-          <p className="text-3xl mb-2">📅</p>
-          <p className="text-sm text-white/30">No matches today for your teams</p>
-          <p className="text-xs text-white/20 mt-1">Check back tomorrow!</p>
+      {/* No matches today — show next events */}
+{favorites.length > 0 && favGames.length === 0 && (
+  <div className="mb-6">
+    <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
+      Upcoming
+    </p>
+    <div className="space-y-3">
+      {favorites.map(fav => (
+        <div key={fav.id || fav.name}>
+          <div className="flex items-center gap-2 mb-2">
+            {fav.logo?.startsWith("http") && (
+              <img src={fav.logo} alt="" className="w-5 h-5 object-contain" />
+            )}
+            <p className="text-xs font-semibold text-white/50">{fav.name}</p>
+          </div>
+          <NextEventCard fav={fav} />
         </div>
-      )}
+      ))}
+    </div>
+  </div>
+)}
 
       {/* Popular teams */}
       <div>
