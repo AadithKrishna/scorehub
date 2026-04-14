@@ -147,13 +147,15 @@ function StatusBadge({ status, minute }) {
   );
 }
 
-function FavButton({ teamId }) {
-  const isFav = useUserStore((s) => s.isFavorite(teamId));
-  const toggle = useUserStore((s) => s.toggleFavorite);
+function FavButton({ game, onShowPicker }) {
+  const { isFavorite } = useUserStore();
+  const isFavHome = isFavorite(game.homeTeam?.name);
+  const isFavAway = isFavorite(game.awayTeam?.name);
+  const isFav = isFavHome || isFavAway;
 
   return (
     <button
-      onClick={(e) => { e.stopPropagation(); toggle(teamId); }}
+      onClick={(e) => { e.stopPropagation(); onShowPicker?.(); }}
       className="transition-all duration-200 hover:scale-110 active:scale-90 p-0.5"
     >
       <span className={`text-xs transition-all duration-200 ${
@@ -165,6 +167,74 @@ function FavButton({ teamId }) {
   );
 }
 
+function TeamFavPicker({ game, onClose }) {
+  const { isFavorite, toggleFavoriteTeam } = useUserStore();
+
+  const teams = [
+    {
+      id: game.homeTeam?.id || game.homeTeam?.name,
+      name: game.homeTeam?.name,
+      logo: game.homeTeam?.logo,
+      league: game.league,
+      leagueId: game.leagueId,
+    },
+    {
+      id: game.awayTeam?.id || game.awayTeam?.name,
+      name: game.awayTeam?.name,
+      logo: game.awayTeam?.logo,
+      league: game.league,
+      leagueId: game.leagueId,
+    },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end justify-center"
+      onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-xl glass-card rounded-t-3xl p-6 pb-10"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-5" />
+        <p className="text-sm font-bold text-white/50 text-center mb-4 uppercase tracking-widest">
+          Follow Team
+        </p>
+        <div className="space-y-3">
+          {teams.map(team => {
+            const fav = isFavorite(team.id) || isFavorite(team.name);
+            return (
+              <button
+                key={team.id}
+                onClick={() => { toggleFavoriteTeam(team); onClose(); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all ${
+                  fav ? "glass-strong ring-1 ring-yellow-400/40" : "glass"
+                }`}
+              >
+                {team.logo?.startsWith("http") ? (
+                  <img src={team.logo} alt="" className="w-10 h-10 object-contain flex-shrink-0" />
+                ) : (
+                  <div className="w-10 h-10 rounded-xl glass-strong flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs font-black text-white/50">
+                      {team.name?.slice(0, 2).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+                <div className="flex-1 text-left">
+                  <p className="text-sm font-bold text-white">{team.name}</p>
+                  <p className="text-xs text-white/30">{team.league}</p>
+                </div>
+                <span className={`text-lg ${fav ? "opacity-100" : "opacity-20"}`}>
+                  {fav ? "⭐" : "☆"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MatchCard({
   game,
   index = 0,
@@ -173,6 +243,7 @@ export default function MatchCard({
   onPress,
 }) {
   const [pressed, setPressed] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
   const isFinished = game.status === "finished";
   const isScheduled = game.status === "scheduled";
 
@@ -199,7 +270,7 @@ export default function MatchCard({
             </span>
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            <FavButton teamId={game.homeTeam.name} />
+            <FavButton game={game} onShowPicker={() => setShowPicker(true)} />
             <StatusBadge status={game.status} minute={game.minute} />
           </div>
         </div>
@@ -239,7 +310,7 @@ export default function MatchCard({
       {/* Status row when grouped */}
       {!showLeague && (
         <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-white/5">
-          <FavButton teamId={game.homeTeam.name} />
+          <FavButton game={game} onShowPicker={() => setShowPicker(true)} />
           {game.status === "live" && (
             <StatusBadge status={game.status} minute={game.minute} />
           )}
@@ -261,6 +332,11 @@ export default function MatchCard({
             </span>
           ))}
         </div>
+      )}
+
+      {/* Team picker */}
+      {showPicker && (
+        <TeamFavPicker game={game} onClose={() => setShowPicker(false)} />
       )}
     </div>
   );
