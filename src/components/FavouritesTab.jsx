@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import useUserStore from "../store/userStore";
 
-
 const TOP_TEAMS = [
   { id: "eng.1", league: "Premier League", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", teams: [
     { id: "360", name: "Manchester United", logo: "https://a.espncdn.com/i/teamlogos/soccer/500/360.png" },
@@ -17,8 +16,8 @@ const TOP_TEAMS = [
     { id: "1068", name: "Atletico Madrid", logo: "https://a.espncdn.com/i/teamlogos/soccer/500/1068.png" },
   ]},
   { id: "ger.1", league: "Bundesliga", flag: "🇩🇪", teams: [
-    { id: "132", name: "Bayern Munich",      logo: "https://a.espncdn.com/i/teamlogos/soccer/500/132.png" },
-    { id: "124", name: "Borussia Dortmund",  logo: "https://a.espncdn.com/i/teamlogos/soccer/500/124.png" },
+    { id: "132", name: "Bayern Munich",     logo: "https://a.espncdn.com/i/teamlogos/soccer/500/132.png" },
+    { id: "124", name: "Borussia Dortmund", logo: "https://a.espncdn.com/i/teamlogos/soccer/500/124.png" },
   ]},
   { id: "ita.1", league: "Serie A", flag: "🇮🇹", teams: [
     { id: "111", name: "Juventus",    logo: "https://a.espncdn.com/i/teamlogos/soccer/500/111.png" },
@@ -27,7 +26,7 @@ const TOP_TEAMS = [
   ]},
 ];
 
-const SOCCER_LEAGUES = ["eng.1","esp.1","ger.1","ita.1","fra.1"];
+const SOCCER_LEAGUES = ["eng.1", "esp.1", "ger.1", "ita.1", "fra.1"];
 
 async function searchFootballTeams(query) {
   const results = [];
@@ -56,13 +55,11 @@ async function searchFootballTeams(query) {
 }
 
 async function searchF1Drivers(query) {
-  const res = await fetch("https://api.jolpi.ca/ergast/f1/2025/drivers.json");
+  const res = await fetch("https://api.jolpi.ca/ergast/f1/2026/drivers.json");
   const data = await res.json();
   const drivers = data.MRData?.DriverTable?.Drivers || [];
   return drivers
-    .filter(d =>
-      `${d.givenName} ${d.familyName}`.toLowerCase().includes(query.toLowerCase())
-    )
+    .filter(d => `${d.givenName} ${d.familyName}`.toLowerCase().includes(query.toLowerCase()))
     .map(d => ({
       id: d.driverId,
       name: `${d.givenName} ${d.familyName}`,
@@ -75,7 +72,7 @@ async function searchF1Drivers(query) {
 }
 
 async function searchMotoGPRiders(query) {
-  const res = await fetch("/api/motogp?path=riders?seasonYear=2025");
+  const res = await fetch("/api/motogp?path=riders%3FseasonYear%3D2026");
   const data = await res.json();
   if (!Array.isArray(data)) return [];
   return data
@@ -97,7 +94,9 @@ async function searchMotoGPRiders(query) {
 
 async function fetchNextEvent(fav) {
   try {
-    if (fav.sport === "soccer" && fav.id && fav.leagueId) {
+    const sport = fav.sport || "soccer";
+
+    if (sport === "soccer" && fav.id && fav.leagueId) {
       const res = await fetch(
         `https://site.api.espn.com/apis/site/v2/sports/soccer/${fav.leagueId}/teams/${fav.id}`
       );
@@ -110,7 +109,6 @@ async function fetchNextEvent(fav) {
       const odds = comp?.odds?.[0];
       return {
         type: "soccer",
-        title: next.shortName,
         date: new Date(next.date),
         venue: comp?.venue?.fullName,
         homeName: home?.team?.shortDisplayName,
@@ -123,7 +121,7 @@ async function fetchNextEvent(fav) {
       };
     }
 
-    if (fav.sport === "f1") {
+    if (sport === "f1") {
       const res = await fetch("https://api.jolpi.ca/ergast/f1/2026.json");
       const data = await res.json();
       const races = data.MRData?.RaceTable?.Races || [];
@@ -139,20 +137,24 @@ async function fetchNextEvent(fav) {
       };
     }
 
-    if (fav.sport === "motogp") {
-      const res = await fetch(`/api/motogp?path=events%3FseasonYear%3D2026`);
+    if (sport === "motogp") {
+      const res = await fetch("/api/motogp?path=events%3FseasonYear%3D2026");
       const data = await res.json();
       const events = Array.isArray(data) ? data : [];
       const now = new Date();
       const next = events
-        .filter(e => e.test === false && new Date(e.date_end) > now)
+        .filter(e => new Date(e.date_start) > now)
         .sort((a, b) => new Date(a.date_start) - new Date(b.date_start))[0];
       if (!next) return null;
+      const cleanName = (next.name || "")
+        .replace(/^.*?GRAND PRIX/i, "Grand Prix")
+        .replace(/GRAND PRIX OF /i, "Grand Prix of ")
+        .trim();
       return {
         type: "motogp",
-        title: next.name,
+        title: cleanName || next.name,
         date: new Date(next.date_start),
-        country: next.country?.name,
+        country: next.circuit?.country,
         circuit: next.circuit?.name,
       };
     }
@@ -173,10 +175,7 @@ function NextEventCard({ fav }) {
     });
   }, [fav.id]);
 
-  if (loading) return (
-    <div className="glass rounded-xl h-20 animate-pulse" />
-  );
-
+  if (loading) return <div className="glass rounded-xl h-20 animate-pulse" />;
   if (!nextEvent) return null;
 
   const dateStr = nextEvent.date.toLocaleDateString(undefined, {
@@ -192,7 +191,9 @@ function NextEventCard({ fav }) {
         <span className="text-xs">
           {nextEvent.type === "f1" ? "🏎️" : nextEvent.type === "motogp" ? "🏍️" : "📅"}
         </span>
-        <p className="text-xs text-white/30 font-semibold uppercase tracking-widest">Next Match</p>
+        <p className="text-xs text-white/30 font-semibold uppercase tracking-widest">
+          {nextEvent.type === "soccer" ? "Next Match" : "Next Race"}
+        </p>
         <div className="ml-auto glass px-2 py-0.5 rounded-full">
           <span className="text-xs text-white/40">{dateStr}</span>
         </div>
@@ -221,8 +222,8 @@ function NextEventCard({ fav }) {
             <div className="flex items-center justify-between glass rounded-xl px-3 py-2">
               {[
                 { label: nextEvent.homeName, val: nextEvent.homeOdds },
-                { label: "Draw", val: nextEvent.drawOdds },
-                { label: nextEvent.awayName, val: nextEvent.awayOdds },
+                { label: "Draw",             val: nextEvent.drawOdds  },
+                { label: nextEvent.awayName, val: nextEvent.awayOdds  },
               ].map(o => (
                 <div key={o.label} className="text-center flex-1">
                   <p className="text-xs text-white/30 truncate px-1">{o.label}</p>
@@ -257,10 +258,10 @@ function NextEventCard({ fav }) {
 
 function SportBadge({ sport }) {
   const map = {
-    soccer: { label: "Football", color: "#10b981" },
-    f1:     { label: "F1",       color: "#ef4444" },
-    motogp: { label: "MotoGP",   color: "#f59e0b" },
-    cricket:{ label: "Cricket",  color: "#3b82f6" },
+    soccer:  { label: "Football", color: "#10b981" },
+    f1:      { label: "F1",       color: "#ef4444" },
+    motogp:  { label: "MotoGP",   color: "#f59e0b" },
+    cricket: { label: "Cricket",  color: "#3b82f6" },
   };
   const s = map[sport] || map.soccer;
   return (
@@ -284,9 +285,9 @@ function TeamSearch({ onClose }) {
       setLoading(true);
       try {
         let found = [];
-        if (activeSport === "soccer") found = await searchFootballTeams(query);
-        else if (activeSport === "f1") found = await searchF1Drivers(query);
-        else if (activeSport === "motogp") found = await searchMotoGPRiders(query);
+        if (activeSport === "soccer")       found = await searchFootballTeams(query);
+        else if (activeSport === "f1")      found = await searchF1Drivers(query);
+        else if (activeSport === "motogp")  found = await searchMotoGPRiders(query);
         setResults(found);
       } catch (err) {
         console.warn(err);
@@ -306,8 +307,6 @@ function TeamSearch({ onClose }) {
   return (
     <div className="fixed inset-0 z-[80] flex flex-col"
       style={{ background: "rgba(7,10,18,0.98)", backdropFilter: "blur(30px)" }}>
-
-      {/* Header */}
       <div className="flex items-center gap-3 px-4 pt-12 pb-3">
         <button onClick={onClose}
           className="w-9 h-9 glass-strong rounded-full flex items-center justify-center flex-shrink-0">
@@ -319,7 +318,11 @@ function TeamSearch({ onClose }) {
             autoFocus
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder={`Search ${activeSport === "soccer" ? "football teams" : activeSport === "f1" ? "F1 drivers" : "MotoGP riders"}...`}
+            placeholder={
+              activeSport === "soccer" ? "Search football teams..." :
+              activeSport === "f1" ? "Search F1 drivers..." :
+              "Search MotoGP riders..."
+            }
             className="flex-1 bg-transparent text-white text-sm placeholder-white/25 outline-none"
           />
           {query && (
@@ -328,7 +331,6 @@ function TeamSearch({ onClose }) {
         </div>
       </div>
 
-      {/* Sport filter */}
       <div className="flex gap-2 px-4 mb-4">
         {sports.map(s => (
           <button
@@ -343,7 +345,6 @@ function TeamSearch({ onClose }) {
         ))}
       </div>
 
-      {/* Results */}
       <div className="flex-1 overflow-y-auto px-4 pb-8">
         {loading ? (
           <div className="space-y-2">
@@ -363,7 +364,6 @@ function TeamSearch({ onClose }) {
                     fav ? "glass-strong ring-1 ring-yellow-400/40" : "glass hover:bg-white/5"
                   }`}
                 >
-                  {/* Logo / Avatar */}
                   {item.logo ? (
                     <img src={item.logo} alt="" className="w-10 h-10 object-contain flex-shrink-0 rounded-lg" />
                   ) : (
@@ -373,22 +373,14 @@ function TeamSearch({ onClose }) {
                       </span>
                     </div>
                   )}
-
-                  {/* Info */}
                   <div className="flex-1 text-left min-w-0">
                     <p className="text-sm font-bold text-white truncate">{item.name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <SportBadge sport={item.sport} />
-                      {item.league && (
-                        <span className="text-xs text-white/30 truncate">{item.league}</span>
-                      )}
-                      {item.number && (
-                        <span className="text-xs text-white/30">#{item.number}</span>
-                      )}
+                      {item.league && <span className="text-xs text-white/30 truncate">{item.league}</span>}
+                      {item.number && <span className="text-xs text-white/30">#{item.number}</span>}
                     </div>
                   </div>
-
-                  {/* Star */}
                   <span className={`text-lg flex-shrink-0 ${fav ? "opacity-100" : "opacity-20"}`}>
                     {fav ? "⭐" : "☆"}
                   </span>
@@ -422,10 +414,9 @@ function TeamSearch({ onClose }) {
 function TeamPill({ team, leagueId, league }) {
   const { isFavorite, toggleFavoriteTeam } = useUserStore();
   const fav = isFavorite(team.id) || isFavorite(team.name);
-
   return (
     <button
-      onClick={() => toggleFavoriteTeam({ ...team, league, leagueId })}
+      onClick={() => toggleFavoriteTeam({ ...team, league, leagueId, sport: "soccer" })}
       className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all flex-shrink-0 ${
         fav ? "glass-strong ring-1 ring-yellow-400/40" : "glass hover:bg-white/5"
       }`}
@@ -443,6 +434,7 @@ export default function FavouritesTab({ allGames, onPress }) {
   const { favorites, removeFavorite } = useUserStore();
   const [showSearch, setShowSearch] = useState(false);
 
+  // Football games for favourite teams
   const favGames = allGames.filter(game =>
     favorites.some(fav =>
       fav.name === game.homeTeam?.name ||
@@ -451,6 +443,13 @@ export default function FavouritesTab({ allGames, onPress }) {
       fav.id === game.awayTeam?.id
     )
   );
+
+  // Separate by sport
+  const soccerFavs = favorites.filter(f => f.sport === "soccer" || !f.sport);
+  const motorFavs  = favorites.filter(f => f.sport === "f1" || f.sport === "motogp");
+
+  // Show popular teams only if no favourites at all
+  const showPopular = favorites.length === 0;
 
   return (
     <div className="pb-8">
@@ -470,7 +469,7 @@ export default function FavouritesTab({ allGames, onPress }) {
         </button>
       </div>
 
-      {/* Followed teams */}
+      {/* Followed teams chips */}
       {favorites.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-5">
           {favorites.map(team => (
@@ -480,6 +479,7 @@ export default function FavouritesTab({ allGames, onPress }) {
                 <img src={team.logo} alt="" className="w-5 h-5 object-contain" />
               )}
               <span className="text-xs font-semibold text-white">{team.name}</span>
+              <SportBadge sport={team.sport || "soccer"} />
               <button
                 onClick={() => removeFavorite(team.id || team.name)}
                 className="text-white/30 hover:text-red-400 transition-colors text-xs ml-1"
@@ -491,8 +491,8 @@ export default function FavouritesTab({ allGames, onPress }) {
         </div>
       )}
 
-      {/* Today's matches */}
-      {favorites.length > 0 && favGames.length > 0 && (
+      {/* Today's football matches */}
+      {soccerFavs.length > 0 && favGames.length > 0 && (
         <div className="mb-6">
           <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
             Today's Matches
@@ -543,79 +543,79 @@ export default function FavouritesTab({ allGames, onPress }) {
         </div>
       )}
 
-      {/* No matches today — show next events */}
-{/* Football: no matches today */}
-{favorites.filter(f => f.sport === "soccer").length > 0 && favGames.length === 0 && (
-  <div className="mb-6">
-    <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
-      Upcoming Football
-    </p>
-    <div className="space-y-3">
-      {favorites.filter(f => f.sport === "soccer").map(fav => (
-        <div key={fav.id || fav.name}>
-          <div className="flex items-center gap-2 mb-2">
-            {fav.logo?.startsWith("http") && (
-              <img src={fav.logo} alt="" className="w-5 h-5 object-contain" />
-            )}
-            <p className="text-xs font-semibold text-white/50">{fav.name}</p>
-          </div>
-          <NextEventCard fav={fav} />
-        </div>
-      ))}
-    </div>
-  </div>
-)}
-
-{/* F1 / MotoGP — always show next race */}
-{favorites.filter(f => f.sport === "f1" || f.sport === "motogp").length > 0 && (
-  <div className="mb-6">
-    <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
-      Next Race
-    </p>
-    <div className="space-y-3">
-      {favorites.filter(f => f.sport === "f1" || f.sport === "motogp").map(fav => (
-        <div key={fav.id || fav.name}>
-          <div className="flex items-center gap-2 mb-2">
-            {fav.logo?.startsWith("http") ? (
-              <img src={fav.logo} alt="" className="w-6 h-6 object-contain rounded-full" />
-            ) : (
-              <span className="text-sm">{fav.sport === "f1" ? "🏎️" : "🏍️"}</span>
-            )}
-            <p className="text-xs font-semibold text-white/50">{fav.name}</p>
-            <span className="text-xs px-2 py-0.5 rounded-full glass ml-auto"
-              style={{ color: fav.sport === "f1" ? "#ef4444" : "#f59e0b" }}>
-              {fav.sport === "f1" ? "F1" : "MotoGP"}
-            </span>
-          </div>
-          <NextEventCard fav={fav} />
-        </div>
-      ))}
-    </div>
-  </div>
-)}
-      {/* Popular teams — only show if no football favourites yet */}
-{favorites.filter(f => f.sport === "soccer" || !f.sport).length === 0 && (
-<div>
-  <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
-    Popular Teams
-  </p>
-        <div className="space-y-4">
-          {TOP_TEAMS.map(league => (
-            <div key={league.id}>
-              <p className="text-xs text-white/20 mb-2 flex items-center gap-1.5">
-                <span>{league.flag}</span>
-                {league.league}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {league.teams.map(team => (
-                  <TeamPill key={team.id} team={team} leagueId={league.id} league={league.league} />
-                ))}
+      {/* Upcoming football — no matches today */}
+      {soccerFavs.length > 0 && favGames.length === 0 && (
+        <div className="mb-6">
+          <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
+            Upcoming
+          </p>
+          <div className="space-y-4">
+            {soccerFavs.map(fav => (
+              <div key={fav.id || fav.name}>
+                <div className="flex items-center gap-2 mb-2">
+                  {fav.logo?.startsWith("http") && (
+                    <img src={fav.logo} alt="" className="w-5 h-5 object-contain" />
+                  )}
+                  <p className="text-xs font-semibold text-white/50">{fav.name}</p>
+                </div>
+                <NextEventCard fav={{ ...fav, sport: fav.sport || "soccer" }} />
               </div>
-            </div>
-      ))}
-    </div>
-  </div>
-)}
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* F1 / MotoGP next race — always show */}
+      {motorFavs.length > 0 && (
+        <div className="mb-6">
+          <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
+            Next Race
+          </p>
+          <div className="space-y-4">
+            {motorFavs.map(fav => (
+              <div key={fav.id || fav.name}>
+                <div className="flex items-center gap-2 mb-2">
+                  {fav.logo?.startsWith("http") ? (
+                    <img src={fav.logo} alt="" className="w-6 h-6 object-contain rounded-full" />
+                  ) : (
+                    <span className="text-sm">{fav.sport === "f1" ? "🏎️" : "🏍️"}</span>
+                  )}
+                  <p className="text-xs font-semibold text-white/50">{fav.name}</p>
+                  <span className="ml-auto text-xs px-2 py-0.5 rounded-full glass"
+                    style={{ color: fav.sport === "f1" ? "#ef4444" : "#f59e0b" }}>
+                    {fav.sport === "f1" ? "F1" : "MotoGP"}
+                  </span>
+                </div>
+                <NextEventCard fav={fav} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Popular teams — only when no favourites at all */}
+      {showPopular && (
+        <div>
+          <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
+            Popular Teams
+          </p>
+          <div className="space-y-4">
+            {TOP_TEAMS.map(league => (
+              <div key={league.id}>
+                <p className="text-xs text-white/20 mb-2 flex items-center gap-1.5">
+                  <span>{league.flag}</span>
+                  {league.league}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {league.teams.map(team => (
+                    <TeamPill key={team.id} team={team} leagueId={league.id} league={league.league} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
