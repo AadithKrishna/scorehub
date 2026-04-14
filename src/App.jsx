@@ -80,7 +80,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen max-w-xl mx-auto">
-      <Header onSearch={() => setShowSearch(true)} />
+      <Header onSearch={() => setShowSearch(true)} showSearch={!isFavouritesTab} />
 
       {/* Modals */}
       {showSearch && (
