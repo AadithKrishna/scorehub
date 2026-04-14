@@ -140,13 +140,13 @@ async function fetchNextEvent(fav) {
     }
 
     if (fav.sport === "motogp") {
-      const res = await fetch(`/api/motogp?path=events?seasonYear=2026&isFinished=false`);
+      const res = await fetch(`/api/motogp?path=events%3FseasonYear%3D2026`);
       const data = await res.json();
       const events = Array.isArray(data) ? data : [];
+      const now = new Date();
       const next = events
-        .filter(e => e.test === false)
-        .sort((a, b) => new Date(a.date_start) - new Date(b.date_start))
-        .find(e => new Date(e.date_end) > new Date());
+        .filter(e => e.test === false && new Date(e.date_end) > now)
+        .sort((a, b) => new Date(a.date_start) - new Date(b.date_start))[0];
       if (!next) return null;
       return {
         type: "motogp",
@@ -593,11 +593,12 @@ export default function FavouritesTab({ allGames, onPress }) {
     </div>
   </div>
 )}
-      {/* Popular teams */}
-      <div>
-        <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
-          Popular Teams
-        </p>
+      {/* Popular teams — only show if no football favourites yet */}
+{favorites.filter(f => f.sport === "soccer" || !f.sport).length === 0 && (
+<div>
+  <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
+    Popular Teams
+  </p>
         <div className="space-y-4">
           {TOP_TEAMS.map(league => (
             <div key={league.id}>
@@ -611,9 +612,10 @@ export default function FavouritesTab({ allGames, onPress }) {
                 ))}
               </div>
             </div>
-          ))}
-        </div>
-      </div>
+      ))}
+    </div>
+  </div>
+)}
     </div>
   );
 }
