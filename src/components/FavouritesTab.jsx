@@ -449,7 +449,7 @@ export default function FavouritesTab({ allGames, onPress }) {
   const motorFavs  = favorites.filter(f => f.sport === "f1" || f.sport === "motogp");
 
   // Show popular teams only if no favourites at all
-  const showPopular = favorites.length === 0;
+  const showPopular = soccerFavs.length === 0;
 
   return (
     <div className="pb-8">
