@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import useUserStore from "../store/userStore";
 
+
 const TOP_TEAMS = [
   { id: "eng.1", league: "Premier League", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", teams: [
     { id: "360", name: "Manchester United", logo: "https://a.espncdn.com/i/teamlogos/soccer/500/360.png" },
@@ -543,13 +544,14 @@ export default function FavouritesTab({ allGames, onPress }) {
       )}
 
       {/* No matches today — show next events */}
-{favorites.length > 0 && favGames.length === 0 && (
+{/* Football: no matches today */}
+{favorites.filter(f => f.sport === "soccer").length > 0 && favGames.length === 0 && (
   <div className="mb-6">
     <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
-      Upcoming
+      Upcoming Football
     </p>
     <div className="space-y-3">
-      {favorites.map(fav => (
+      {favorites.filter(f => f.sport === "soccer").map(fav => (
         <div key={fav.id || fav.name}>
           <div className="flex items-center gap-2 mb-2">
             {fav.logo?.startsWith("http") && (
@@ -564,6 +566,33 @@ export default function FavouritesTab({ allGames, onPress }) {
   </div>
 )}
 
+{/* F1 / MotoGP — always show next race */}
+{favorites.filter(f => f.sport === "f1" || f.sport === "motogp").length > 0 && (
+  <div className="mb-6">
+    <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
+      Next Race
+    </p>
+    <div className="space-y-3">
+      {favorites.filter(f => f.sport === "f1" || f.sport === "motogp").map(fav => (
+        <div key={fav.id || fav.name}>
+          <div className="flex items-center gap-2 mb-2">
+            {fav.logo?.startsWith("http") ? (
+              <img src={fav.logo} alt="" className="w-6 h-6 object-contain rounded-full" />
+            ) : (
+              <span className="text-sm">{fav.sport === "f1" ? "🏎️" : "🏍️"}</span>
+            )}
+            <p className="text-xs font-semibold text-white/50">{fav.name}</p>
+            <span className="text-xs px-2 py-0.5 rounded-full glass ml-auto"
+              style={{ color: fav.sport === "f1" ? "#ef4444" : "#f59e0b" }}>
+              {fav.sport === "f1" ? "F1" : "MotoGP"}
+            </span>
+          </div>
+          <NextEventCard fav={fav} />
+        </div>
+      ))}
+    </div>
+  </div>
+)}
       {/* Popular teams */}
       <div>
         <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
