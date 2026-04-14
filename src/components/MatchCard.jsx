@@ -190,9 +190,10 @@ function TeamFavPicker({ game, onClose }) {
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center"
       onClick={onClose}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
       <div
-        className="relative w-full max-w-xl glass-card rounded-t-3xl p-6 pb-10"
+        className="relative w-full max-w-xl rounded-t-3xl p-6 pb-10"
+        style={{ background: "rgba(15, 18, 30, 0.98)", backdropFilter: "blur(40px)", border: "1px solid rgba(255,255,255,0.1)" }}
         onClick={e => e.stopPropagation()}
       >
         <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-5" />
