@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import MotoGPDriverDetail from "./MotoGPDriverDetail";
+
 
 const SEASON_UUID = "e88b4e43-2209-47aa-8e83-0e0b1cedde6e";
 const CATEGORY_UUID = "e8c110ad-64aa-4e8e-8a86-f2f152f6a942";
@@ -69,7 +71,7 @@ function labelSessions(sessions) {
 
 // ── Rider Standings ────────────────────────────────────
 
-function RiderStandings() {
+function RiderStandings({ onSelectRider }) {
   const [standings, setStandings] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -105,10 +107,11 @@ function RiderStandings() {
         const isTop3 = s.position <= 3;
         return (
           <div
-            key={s.id}
-            className="glass-card rounded-2xl px-4 py-3 flex items-center gap-3"
-            style={isTop3 ? { borderLeft: `3px solid ${color}` } : {}}
-          >
+  key={s.id}
+  className="glass-card rounded-2xl px-4 py-3 flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-transform"
+  style={isTop3 ? { borderLeft: `3px solid ${color}` } : {}}
+  onClick={() => onSelectRider?.(s.rider)}
+>
             <span className={`text-lg font-black w-6 text-center tabular-nums ${
               s.position === 1 ? "text-yellow-400" :
               s.position === 2 ? "text-slate-300" :
@@ -673,6 +676,7 @@ function RaceDetail({ event, onClose }) {
 export default function MotoGPPage() {
   const [activeTab, setActiveTab] = useState("calendar");
   const [selectedRace, setSelectedRace] = useState(null);
+  const [selectedRider, setSelectedRider] = useState(null);
 
   const tabs = [
     { id: "calendar",     label: "Calendar",     icon: "📅" },
@@ -683,11 +687,17 @@ export default function MotoGPPage() {
   return (
     <div className="pb-8">
       {selectedRace && (
-        <RaceDetail
-          event={selectedRace}
-          onClose={() => setSelectedRace(null)}
-        />
-      )}
+  <RaceDetail
+    event={selectedRace}
+    onClose={() => setSelectedRace(null)}
+  />
+)}
+{selectedRider && (
+  <MotoGPDriverDetail
+    rider={selectedRider}
+    onClose={() => setSelectedRider(null)}
+  />
+)}
 
       {/* MotoGP header */}
       <div className="px-4 pt-2 pb-4">
@@ -743,7 +753,7 @@ export default function MotoGPPage() {
       {activeTab === "calendar" && (
         <RaceCalendar onSelectRace={setSelectedRace} />
       )}
-      {activeTab === "riders" && <RiderStandings />}
+      {activeTab === "riders" && <RiderStandings onSelectRider={setSelectedRider} />}
       {activeTab === "constructors" && <ConstructorStandings />}
     </div>
   );

@@ -24,7 +24,7 @@ export default function Header({ onSearch, showSearch = true }) {
   >
     <span className="text-white/60 text-sm">🔍</span>
   </button>
-)}
+)}  
         <button className="glass w-10 h-10 flex items-center justify-center rounded-2xl hover:bg-white/10 transition-all hover:scale-105 active:scale-95 relative">
           <Bell size={16} className="text-white/60" />
           <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-[#080810]" />

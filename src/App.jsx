@@ -8,6 +8,7 @@ import MatchDetail from "./components/MatchDetail";
 import BottomNav from "./components/BottomNav";
 import F1Page from "./components/F1Page";
 import MotoGPPage from "./components/MotoGPPage";
+import CricketPage from "./components/CricketPage";
 import LeagueDetail from "./components/LeagueDetail";
 import TeamDetail from "./components/TeamDetail";
 import { SPORTS, MOTORSPORT_IDS } from "./data/mockData";
@@ -34,11 +35,12 @@ export default function App() {
   const isFavouritesTab = activeSport === "favourites";
   const isF1 = activeSport === "f1";
   const isMotoGP = activeSport === "motogp";
+  const isCricket = activeSport === "cricket";
   const isMotorsport = MOTORSPORT_IDS.includes(activeSport);
 
   const { data: games = [], isLoading } = useGames(
-    isFavouritesTab ? "soccer" : activeSport
-  );
+  isFavouritesTab || isCricket ? "soccer" : activeSport
+);
 
   const filteredGames = useMemo(() => {
     if (!liveOnly) return games;
@@ -118,13 +120,17 @@ export default function App() {
         />
       )}
 
-      {/* F1 */}
+            {/* F1 */}
       {isF1 ? (
         <F1Page />
 
       /* MotoGP */
       ) : isMotoGP ? (
         <MotoGPPage />
+
+      /* Cricket */
+      ) : isCricket ? (
+        <CricketPage />
 
       /* Favourites */
       ) : isFavouritesTab ? (

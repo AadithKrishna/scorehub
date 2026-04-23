@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 
+
 async function fetchMotoGPRiderStats(riderId) {
   try {
     const res = await fetch(`/api/motogp?path=riders%2F${riderId}`);

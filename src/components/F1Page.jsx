@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import F1DriverDetail from "./F1DriverDetail";
+
 
 const JOLPICA = "https://api.jolpi.ca/ergast/f1";
 
@@ -32,7 +34,7 @@ function countryFlag(nationality) {
 
 // ── Driver Standings ───────────────────────────────────
 
-function DriverStandings() {
+function DriverStandings({ onSelectDriver }) {
   const [standings, setStandings] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -64,8 +66,9 @@ function DriverStandings() {
         return (
           <div
             key={s.Driver.driverId}
-            className="glass-card rounded-2xl px-4 py-3 flex items-center gap-3"
+            className="glass-card rounded-2xl px-4 py-3 flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-transform"
             style={isTop3 ? { borderLeft: `3px solid ${color}` } : {}}
+            onClick={() => onSelectDriver?.(s.Driver)}
           >
             <span className={`text-lg font-black w-6 text-center tabular-nums ${
               s.position === "1" ? "text-yellow-400" :
@@ -615,6 +618,7 @@ function RaceDetail({ race, onClose }) {
 export default function F1Page() {
   const [activeTab, setActiveTab] = useState("calendar");
   const [selectedRace, setSelectedRace] = useState(null);
+  const [selectedDriver, setSelectedDriver] = useState(null);
 
   const tabs = [
     { id: "calendar",     label: "Calendar",     icon: "📅" },
@@ -625,11 +629,17 @@ export default function F1Page() {
   return (
     <div className="pb-8">
       {selectedRace && (
-        <RaceDetail
-          race={selectedRace}
-          onClose={() => setSelectedRace(null)}
-        />
-      )}
+  <RaceDetail
+    race={selectedRace}
+    onClose={() => setSelectedRace(null)}
+  />
+)}
+{selectedDriver && (
+  <F1DriverDetail
+    driver={selectedDriver}
+    onClose={() => setSelectedDriver(null)}
+  />
+)}
 
       {/* F1 header */}
       <div className="px-4 pt-2 pb-4">
@@ -685,7 +695,7 @@ export default function F1Page() {
       {activeTab === "calendar" && (
         <RaceCalendar onSelectRace={setSelectedRace} />
       )}
-      {activeTab === "drivers" && <DriverStandings />}
+      {activeTab === "drivers" && <DriverStandings onSelectDriver={setSelectedDriver} />}
       {activeTab === "constructors" && <ConstructorStandings />}
     </div>
   );
