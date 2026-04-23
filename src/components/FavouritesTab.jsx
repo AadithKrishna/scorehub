@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import useUserStore from "../store/userStore";
 import F1DriverDetail from "./F1DriverDetail";
-import MotoGPRiderDetail from "./MotoGPRiderDetail";
+import MotoGPRiderDetail from "./MotoGPDriverDetail";
 
 const TOP_TEAMS = [
   { id: "eng.1", league: "Premier League", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", teams: [
