@@ -8,24 +8,18 @@ function mgp(path) {
   return `${MGP_PROXY}?path=${encodeURIComponent(path)}`;
 }
 
-// Handles two shapes:
-//   From MotoGPPage standings → s.rider = { id, full_name, number, country, pictures }
-//   From FavouritesTab        → { id, name, number, team, sport }
 function normaliseRider(rider) {
   return {
-    id:          rider.id,
-    name:        rider.full_name || rider.name,
-    number:      rider.number,
-    nationality: rider.country?.name,
-    flag:        rider.country?.iso,
-    logo:        rider.pictures?.profile?.main || rider.logo || null,
+    id:     rider.id,
+    name:   rider.full_name || rider.name,
+    number: rider.number,
+    logo:   rider.pictures?.profile?.main || rider.logo || null,
   };
 }
 
 async function fetchMotoGPRiderStats(riderId) {
   if (!riderId) return null;
   try {
-    // 1. Rider profile (bio + career timeline)
     const profileRes = await fetch(mgp(`riders/${riderId}`));
     const profile    = await profileRes.json();
 
@@ -33,7 +27,6 @@ async function fetchMotoGPRiderStats(riderId) {
       .filter(c => c.category?.name === "MotoGP")
       .sort((a, b) => b.season - a.season);
 
-    // 2. Current season standings to get live points/position/wins
     const standingsRes  = await fetch(
       mgp(`results/standings?seasonUuid=${SEASON_UUID}&categoryUuid=${CATEGORY_UUID}`)
     );
@@ -41,7 +34,6 @@ async function fetchMotoGPRiderStats(riderId) {
     const currentStanding = (standingsData.classification || [])
       .find(s => s.rider?.id === riderId);
 
-    // 3. Career stats (not always present in the API)
     const careerStats = {
       wins:    profile.career_stats?.total_wins    ?? null,
       poles:   profile.career_stats?.total_poles   ?? null,
@@ -52,10 +44,13 @@ async function fetchMotoGPRiderStats(riderId) {
     return {
       name:        `${profile.name} ${profile.surname}`.trim(),
       nationality: profile.country?.name,
-      flag:        profile.country?.flag,
-      birthDate:   profile.birth_date,
+      flagUrl:     profile.country?.flag,
       birthCity:   profile.birth_city,
       age:         profile.years_old,
+      number:      career[0]?.number ?? null,
+      photo:       profile.current_career_step?.pictures?.profile?.main
+                   || profile.pictures?.profile?.main
+                   || null,
       career,
       careerStats,
       currentStanding: currentStanding ? {
@@ -90,6 +85,13 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
     setTimeout(onClose, 300);
   }
 
+  // Always use API data once loaded — identical regardless of which tab opened this
+  const displayName   = stats?.name        || r.name;
+  const displayNat    = stats?.nationality  || "MotoGP";
+  const displayPhoto  = stats?.photo        || r.logo || null;
+  const displayNumber = stats?.number       || r.number;
+  const displayFlag   = stats?.flagUrl      || null;
+
   return (
     <div
       className="fixed inset-0 z-[60] flex flex-col"
@@ -100,19 +102,16 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
         transition:     "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)",
       }}
     >
-      {/* Header */}
       <div className="flex items-center justify-between px-4 pt-12 pb-4">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          {r.logo ? (
-            <img src={r.logo} alt="" className="w-14 h-14 object-contain rounded-xl flex-shrink-0" />
+          {displayPhoto ? (
+            <img src={displayPhoto} alt="" className="w-14 h-14 object-contain rounded-xl flex-shrink-0" />
           ) : (
             <div
               className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{ background: "rgba(245,158,11,0.15)", border: "2px solid rgba(245,158,11,0.4)" }}
             >
-              <span className="text-lg font-black text-yellow-400">
-                {r.number || "🏍️"}
-              </span>
+              <span className="text-lg font-black text-yellow-400">{displayNumber || "🏍️"}</span>
             </div>
           )}
           <div className="min-w-0">
@@ -120,25 +119,21 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
               className="text-lg font-black text-white leading-tight truncate"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
-              {stats?.name || r.name}
+              {displayName}
             </h2>
             <div className="flex items-center gap-2 mt-0.5">
-              {stats?.flag && (
-                <img src={stats.flag} alt="" className="w-4 h-3 object-cover rounded-sm" />
+              {displayFlag && (
+                <img src={displayFlag} alt="" className="w-4 h-3 object-cover rounded-sm" />
               )}
-              <span className="text-xs text-white/40">
-                {stats?.nationality || r.nationality || "MotoGP"}
-              </span>
-              {r.number && (
-                <span className="text-xs text-yellow-400/70">#{r.number}</span>
+              <span className="text-xs text-white/40">{displayNat}</span>
+              {displayNumber && (
+                <span className="text-xs text-yellow-400/70">#{displayNumber}</span>
               )}
             </div>
           </div>
         </div>
-        <button
-          onClick={handleClose}
-          className="w-9 h-9 glass-strong rounded-full flex items-center justify-center hover:bg-white/10 flex-shrink-0"
-        >
+        <button onClick={handleClose}
+          className="w-9 h-9 glass-strong rounded-full flex items-center justify-center hover:bg-white/10 flex-shrink-0">
           <span className="text-white/60 text-xl leading-none">×</span>
         </button>
       </div>
@@ -158,12 +153,9 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
           </div>
         ) : (
           <>
-            {/* 2026 Season */}
             {stats.currentStanding && (
               <div className="glass-card rounded-2xl p-4">
-                <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
-                  2026 Season
-                </p>
+                <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">2026 Season</p>
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     {
@@ -185,12 +177,9 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
               </div>
             )}
 
-            {/* Career stats — only shown if API returns them */}
             {(stats.careerStats.wins !== null || stats.careerStats.races !== null) && (
               <div className="glass-card rounded-2xl p-4">
-                <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
-                  MotoGP Career
-                </p>
+                <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">MotoGP Career</p>
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { label: "Races",   value: stats.careerStats.races   ?? "—", color: "white"   },
@@ -207,11 +196,8 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
               </div>
             )}
 
-            {/* Profile */}
             <div className="glass-card rounded-2xl p-4">
-              <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
-                Profile
-              </p>
+              <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">Profile</p>
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { label: "Age",          value: stats.age ? `${stats.age} yrs` : "—" },
@@ -228,46 +214,34 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
               </div>
             </div>
 
-            {/* Career timeline */}
             {stats.career.length > 0 && (
               <div className="glass-card rounded-2xl p-4">
-                <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
-                  MotoGP Career Timeline
-                </p>
+                <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">MotoGP Career Timeline</p>
                 <div className="space-y-2">
                   {stats.career.map(c => {
                     const teamColor = c.team?.color || "#f59e0b";
                     const isCurrent = c.current;
                     return (
-                      <div
-                        key={c.season}
+                      <div key={c.season}
                         className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${
                           isCurrent ? "glass-strong ring-1 ring-yellow-400/30" : "glass"
                         }`}
                       >
-                        <span className="text-sm font-black text-white/60 w-10 flex-shrink-0">
-                          {c.season}
-                        </span>
+                        <span className="text-sm font-black text-white/60 w-10 flex-shrink-0">{c.season}</span>
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           {c.team?.picture ? (
-                            <img src={c.team.picture} alt=""
-                              className="w-6 h-6 object-contain flex-shrink-0" />
+                            <img src={c.team.picture} alt="" className="w-6 h-6 object-contain flex-shrink-0" />
                           ) : (
-                            <div className="w-2 h-2 rounded-full flex-shrink-0"
-                              style={{ background: teamColor }} />
+                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: teamColor }} />
                           )}
                           <span className="text-xs font-semibold text-white truncate">
                             {c.sponsored_team || c.team?.name}
                           </span>
                           {isCurrent && (
-                            <span className="text-xs text-yellow-400/70 flex-shrink-0">
-                              Current
-                            </span>
+                            <span className="text-xs text-yellow-400/70 flex-shrink-0">Current</span>
                           )}
                         </div>
-                        <span className="text-xs font-bold text-white/40 flex-shrink-0">
-                          #{c.number}
-                        </span>
+                        <span className="text-xs font-bold text-white/40 flex-shrink-0">#{c.number}</span>
                       </div>
                     );
                   })}

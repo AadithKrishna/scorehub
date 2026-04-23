@@ -10,9 +10,6 @@ const TEAM_COLORS = {
   renault:     "#FFF500", force_india:"#FF80C7", lotus_f1:    "#FFB800",
 };
 
-// Handles two shapes:
-//   From F1Page standings  → s.Driver = { driverId, givenName, familyName, nationality, permanentNumber }
-//   From FavouritesTab     → { id, name, number, nationality, sport }
 function normaliseDriver(driver) {
   return {
     driverId:    driver.driverId    || driver.id,
@@ -25,12 +22,13 @@ function normaliseDriver(driver) {
 async function fetchF1DriverStats(driverId) {
   if (!driverId) return null;
   try {
-    const [winsRes, polesRes, p2Res, p3Res, racesRes] = await Promise.all([
+    const [winsRes, polesRes, p2Res, p3Res, racesRes, standingsRes] = await Promise.all([
       fetch(`${JOLPICA}/drivers/${driverId}/results/1.json?limit=500`).then(r => r.json()),
       fetch(`${JOLPICA}/drivers/${driverId}/qualifying/1.json?limit=500`).then(r => r.json()),
       fetch(`${JOLPICA}/drivers/${driverId}/results/2.json?limit=500`).then(r => r.json()),
       fetch(`${JOLPICA}/drivers/${driverId}/results/3.json?limit=500`).then(r => r.json()),
-      fetch(`${JOLPICA}/drivers/${driverId}/results.json?limit=100`).then(r => r.json()),
+      fetch(`${JOLPICA}/drivers/${driverId}/results.json?limit=1`).then(r => r.json()),
+      fetch(`${JOLPICA}/drivers/${driverId}/driverStandings.json?limit=100`).then(r => r.json()),
     ]);
 
     const wins    = parseInt(winsRes.MRData?.total   || 0);
@@ -40,31 +38,22 @@ async function fetchF1DriverStats(driverId) {
     const races   = parseInt(racesRes.MRData?.total  || 0);
     const podiums = wins + p2s + p3s;
 
-    const raceList = racesRes.MRData?.RaceTable?.Races || [];
-    const seasons  = [...new Set(raceList.map(r => r.season))].sort();
-    const recentSeasons = seasons.slice(-15);
+    const standingsLists = standingsRes.MRData?.StandingsTable?.StandingsLists || [];
 
-    const settled = await Promise.allSettled(
-      recentSeasons.map(season =>
-        fetch(`${JOLPICA}/${season}/drivers/${driverId}/driverStandings.json`)
-          .then(r => r.json())
-          .then(d => {
-            const s = d.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings?.[0];
-            return s ? {
-              season,
-              position: parseInt(s.position),
-              points:   parseFloat(s.points),
-              wins:     parseInt(s.wins),
-              team:     s.Constructors?.[0]?.name,
-              teamId:   s.Constructors?.[0]?.constructorId,
-            } : null;
-          })
-      )
-    );
-
-    const seasonStats = settled
-      .filter(r => r.status === "fulfilled" && r.value)
-      .map(r => r.value)
+    const seasonStats = standingsLists
+      .map(list => {
+        const s = list.DriverStandings?.[0];
+        if (!s) return null;
+        return {
+          season:   list.season,
+          position: parseInt(s.position),
+          points:   parseFloat(s.points),
+          wins:     parseInt(s.wins),
+          team:     s.Constructors?.[0]?.name,
+          teamId:   s.Constructors?.[0]?.constructorId,
+        };
+      })
+      .filter(Boolean)
       .sort((a, b) => b.season - a.season);
 
     return {
@@ -111,16 +100,13 @@ export default function F1DriverDetail({ driver, onClose }) {
         transition:     "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)",
       }}
     >
-      {/* Header */}
       <div className="flex items-center justify-between px-4 pt-12 pb-4">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div
             className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{ background: "rgba(239,68,68,0.15)", border: "2px solid rgba(239,68,68,0.4)" }}
           >
-            <span className="text-lg font-black text-red-400">
-              {d.number || "F1"}
-            </span>
+            <span className="text-lg font-black text-red-400">{d.number || "F1"}</span>
           </div>
           <div className="min-w-0">
             <h2
@@ -134,18 +120,14 @@ export default function F1DriverDetail({ driver, onClose }) {
               {championSeasons.length > 0 && (
                 <>
                   <span className="text-white/20 text-xs">·</span>
-                  <span className="text-xs text-yellow-400">
-                    {championSeasons.length}× Champion 🏆
-                  </span>
+                  <span className="text-xs text-yellow-400">{championSeasons.length}× Champion 🏆</span>
                 </>
               )}
             </div>
           </div>
         </div>
-        <button
-          onClick={handleClose}
-          className="w-9 h-9 glass-strong rounded-full flex items-center justify-center hover:bg-white/10 flex-shrink-0"
-        >
+        <button onClick={handleClose}
+          className="w-9 h-9 glass-strong rounded-full flex items-center justify-center hover:bg-white/10 flex-shrink-0">
           <span className="text-white/60 text-xl leading-none">×</span>
         </button>
       </div>
@@ -165,11 +147,8 @@ export default function F1DriverDetail({ driver, onClose }) {
           </div>
         ) : (
           <>
-            {/* Career stats grid */}
             <div className="glass-card rounded-2xl p-4">
-              <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
-                Career Stats
-              </p>
+              <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">Career Stats</p>
               <div className="grid grid-cols-3 gap-2 mb-2">
                 {[
                   { label: "Races",   value: stats.races,   color: "white"   },
@@ -196,12 +175,9 @@ export default function F1DriverDetail({ driver, onClose }) {
               </div>
             </div>
 
-            {/* Championships */}
             {championSeasons.length > 0 && (
               <div className="glass-card rounded-2xl p-4">
-                <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
-                  🏆 World Championships
-                </p>
+                <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">🏆 World Championships</p>
                 <div className="flex flex-wrap gap-2">
                   {championSeasons.map(s => (
                     <div key={s.season} className="flex items-center gap-2 glass-strong px-3 py-2 rounded-xl">
@@ -215,29 +191,22 @@ export default function F1DriverDetail({ driver, onClose }) {
               </div>
             )}
 
-            {/* Season history */}
             {stats.seasonStats.length > 0 && (
               <div className="glass-card rounded-2xl p-4">
-                <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
-                  Season History
-                </p>
+                <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">Season History</p>
                 <div className="space-y-2">
                   {stats.seasonStats.map(s => {
                     const teamColor = TEAM_COLORS[s.teamId] || "#8b5cf6";
                     const isChamp   = s.position === 1;
                     return (
-                      <div
-                        key={s.season}
+                      <div key={s.season}
                         className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${
                           isChamp ? "glass-strong ring-1 ring-yellow-400/30" : "glass"
                         }`}
                       >
-                        <span className="text-sm font-black text-white/60 w-10 flex-shrink-0">
-                          {s.season}
-                        </span>
+                        <span className="text-sm font-black text-white/60 w-10 flex-shrink-0">{s.season}</span>
                         <div className="flex-1 min-w-0 flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full flex-shrink-0"
-                            style={{ background: teamColor }} />
+                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: teamColor }} />
                           <span className="text-xs font-semibold text-white truncate">{s.team}</span>
                           {isChamp && <span className="text-xs">🏆</span>}
                         </div>
@@ -251,9 +220,7 @@ export default function F1DriverDetail({ driver, onClose }) {
                             <p className="text-xs font-bold text-white">{s.points}</p>
                             <p className="text-xs text-white/25">pts</p>
                           </div>
-                          {s.wins > 0 && (
-                            <p className="text-xs font-bold text-yellow-400">{s.wins}W</p>
-                          )}
+                          {s.wins > 0 && <p className="text-xs font-bold text-yellow-400">{s.wins}W</p>}
                         </div>
                       </div>
                     );
