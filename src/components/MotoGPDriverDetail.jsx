@@ -1,4 +1,4 @@
-import { useState, useEffect } from "text";
+import { useState, useEffect } from "react";
 
 async function fetchMotoGPRiderStats(riderId) {
   try {
