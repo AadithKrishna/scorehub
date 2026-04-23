@@ -8,7 +8,12 @@ function mgp(path) {
   return `${MGP_PROXY}?path=${encodeURIComponent(path)}`;
 }
 
-function normaliseRider(rider) {
+// Two shapes come in:
+//   MotoGPPage standings → s.rider = { id, full_name, number, country:{name,iso}, pictures }
+//   FavouritesTab        → { id, name, number, team, sport, logo }  ← no country
+// Only id + fallback name/number used before API responds.
+// Everything else always sourced from the API so both tabs show identical info.
+function normalise(rider) {
   return {
     id:     rider.id,
     name:   rider.full_name || rider.name,
@@ -17,50 +22,54 @@ function normaliseRider(rider) {
   };
 }
 
-async function fetchMotoGPRiderStats(riderId) {
+async function fetchStats(riderId) {
   if (!riderId) return null;
   try {
-    const profileRes = await fetch(mgp(`riders/${riderId}`));
-    const profile    = await profileRes.json();
+    // 1. Full rider profile — bio, personal info, career timeline
+    const profile = await fetch(mgp(`riders/${riderId}`)).then(r => r.json());
 
     const career = (profile.career || [])
       .filter(c => c.category?.name === "MotoGP")
       .sort((a, b) => b.season - a.season);
 
-    const standingsRes  = await fetch(
+    // 2. Current 2026 season standings
+    const standings = await fetch(
       mgp(`results/standings?seasonUuid=${SEASON_UUID}&categoryUuid=${CATEGORY_UUID}`)
-    );
-    const standingsData = await standingsRes.json();
-    const currentStanding = (standingsData.classification || [])
-      .find(s => s.rider?.id === riderId);
+    ).then(r => r.json());
 
+    const current = (standings.classification || []).find(s => s.rider?.id === riderId);
+
+    // 3. Career aggregate stats (only present for some riders)
+    const cs = profile.career_stats;
     const careerStats = {
-      wins:    profile.career_stats?.total_wins    ?? null,
-      poles:   profile.career_stats?.total_poles   ?? null,
-      podiums: profile.career_stats?.total_podiums ?? null,
-      races:   profile.career_stats?.total_races   ?? null,
+      races:   cs?.total_races   ?? null,
+      wins:    cs?.total_wins    ?? null,
+      podiums: cs?.total_podiums ?? null,
+      poles:   cs?.total_poles   ?? null,
     };
 
     return {
-      name:        `${profile.name} ${profile.surname}`.trim(),
-      nationality: profile.country?.name,
-      flagUrl:     profile.country?.flag,
-      birthCity:   profile.birth_city,
-      age:         profile.years_old,
-      number:      career[0]?.number ?? null,
-      photo:       profile.current_career_step?.pictures?.profile?.main
-                   || profile.pictures?.profile?.main
-                   || null,
+      name:           `${profile.name} ${profile.surname}`.trim(),
+      nationality:    profile.country?.name  || null,
+      flagUrl:        profile.country?.flag  || null,
+      birthDate:      profile.birth_date     || null,
+      birthCity:      profile.birth_city     || null,
+      age:            profile.years_old      || null,
+      number:         career[0]?.number      ?? null,
+      photo:          profile.current_career_step?.pictures?.profile?.main
+                      || profile.pictures?.profile?.main
+                      || null,
       career,
       careerStats,
-      currentStanding: currentStanding ? {
-        position: currentStanding.position,
-        points:   currentStanding.points,
-        wins:     currentStanding.race_wins,
+      hasCareerStats: Object.values(careerStats).some(v => v !== null),
+      current: current ? {
+        position: current.position,
+        points:   current.points,
+        wins:     current.race_wins,
       } : null,
     };
   } catch (err) {
-    console.warn("MotoGP rider stats error:", err.message);
+    console.warn("MotoGP stats error:", err.message);
     return null;
   }
 }
@@ -70,106 +79,114 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
   const [stats,   setStats]   = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const r = normaliseRider(rider);
+  const r = normalise(rider);
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 10);
-    fetchMotoGPRiderStats(r.id).then(s => {
-      setStats(s);
-      setLoading(false);
-    });
+    fetchStats(r.id).then(s => { setStats(s); setLoading(false); });
   }, []);
 
-  function handleClose() {
-    setVisible(false);
-    setTimeout(onClose, 300);
-  }
+  function handleClose() { setVisible(false); setTimeout(onClose, 300); }
 
-  // Always use API data once loaded — identical regardless of which tab opened this
-  const displayName   = stats?.name        || r.name;
-  const displayNat    = stats?.nationality  || "MotoGP";
-  const displayPhoto  = stats?.photo        || r.logo || null;
-  const displayNumber = stats?.number       || r.number;
-  const displayFlag   = stats?.flagUrl      || null;
+  // Always prefer API values — consistent from both tabs
+  const name   = stats?.name        || r.name;
+  const nat    = stats?.nationality  || null;
+  const flag   = stats?.flagUrl      || null;
+  const photo  = stats?.photo        || r.logo || null;
+  const number = stats?.number       || r.number;
+
+  const dobStr = stats?.birthDate
+    ? new Date(stats.birthDate).toLocaleDateString("en-US", {
+        day: "numeric", month: "long", year: "numeric"
+      })
+    : null;
+
+  const debut = stats?.career.length
+    ? stats.career[stats.career.length - 1].season
+    : null;
 
   return (
     <div
       className="fixed inset-0 z-[60] flex flex-col"
       style={{
-        background:     "rgba(7, 10, 18, 0.98)",
+        background:     "rgba(7,10,18,0.98)",
         backdropFilter: "blur(30px)",
         transform:      visible ? "translateY(0)" : "translateY(100%)",
-        transition:     "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)",
+        transition:     "transform 0.35s cubic-bezier(0.32,0.72,0,1)",
       }}
     >
-      <div className="flex items-center justify-between px-4 pt-12 pb-4">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 pt-12 pb-4 border-b border-white/6">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          {displayPhoto ? (
-            <img src={displayPhoto} alt="" className="w-14 h-14 object-contain rounded-xl flex-shrink-0" />
+          {photo ? (
+            <img src={photo} alt=""
+              className="w-14 h-14 object-contain rounded-xl flex-shrink-0" />
           ) : (
             <div
               className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{ background: "rgba(245,158,11,0.15)", border: "2px solid rgba(245,158,11,0.4)" }}
             >
-              <span className="text-lg font-black text-yellow-400">{displayNumber || "🏍️"}</span>
+              <span className="text-lg font-black text-yellow-400">{number || "🏍️"}</span>
             </div>
           )}
           <div className="min-w-0">
             <h2
-              className="text-lg font-black text-white leading-tight truncate"
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              className="text-xl font-black text-white leading-tight truncate"
+              style={{ fontFamily: "'Space Grotesk',sans-serif" }}
             >
-              {displayName}
+              {name}
             </h2>
-            <div className="flex items-center gap-2 mt-0.5">
-              {displayFlag && (
-                <img src={displayFlag} alt="" className="w-4 h-3 object-cover rounded-sm" />
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              {flag && (
+                <img src={flag} alt="" className="w-4 h-3 object-cover rounded-sm flex-shrink-0" />
               )}
-              <span className="text-xs text-white/40">{displayNat}</span>
-              {displayNumber && (
-                <span className="text-xs text-yellow-400/70">#{displayNumber}</span>
-              )}
+              {nat    && <span className="text-xs text-white/40">{nat}</span>}
+              {number && <span className="text-xs text-yellow-400/70">#{number}</span>}
+              {stats?.age && <span className="text-xs text-white/25">· {stats.age} yrs</span>}
             </div>
           </div>
         </div>
         <button onClick={handleClose}
-          className="w-9 h-9 glass-strong rounded-full flex items-center justify-center hover:bg-white/10 flex-shrink-0">
+          className="w-9 h-9 glass-strong rounded-full flex items-center justify-center flex-shrink-0">
           <span className="text-white/60 text-xl leading-none">×</span>
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 pb-10 space-y-4 pt-4">
         {loading ? (
           <div className="space-y-3">
-            {Array.from({ length: 4 }).map((_, i) => (
+            {[1,2,3,4].map(i => (
               <div key={i} className="glass rounded-xl h-20 animate-pulse"
-                style={{ animationDelay: `${i * 80}ms` }} />
+                style={{ animationDelay: `${i*80}ms` }} />
             ))}
           </div>
         ) : !stats ? (
-          <div className="text-center py-12">
-            <p className="text-3xl mb-2">🏍️</p>
+          <div className="text-center py-16">
+            <p className="text-4xl mb-3">🏍️</p>
             <p className="text-sm text-white/30">No stats available</p>
           </div>
         ) : (
           <>
-            {stats.currentStanding && (
+            {/* 2026 Season */}
+            {stats.current && (
               <div className="glass-card rounded-2xl p-4">
-                <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">2026 Season</p>
+                <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
+                  2026 Season
+                </p>
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     {
                       label: "Position",
-                      value: `P${stats.currentStanding.position}`,
-                      color: stats.currentStanding.position === 1 ? "#f59e0b" :
-                             stats.currentStanding.position === 2 ? "#cbd5e1" :
-                             stats.currentStanding.position === 3 ? "#92400e" : "white",
+                      value: `P${stats.current.position}`,
+                      color: stats.current.position === 1 ? "#f59e0b" :
+                             stats.current.position === 2 ? "#cbd5e1" :
+                             stats.current.position === 3 ? "#92400e" : "white",
                     },
-                    { label: "Points", value: stats.currentStanding.points, color: "#10b981" },
-                    { label: "Wins",   value: stats.currentStanding.wins,   color: "#f59e0b" },
+                    { label: "Points", value: stats.current.points, color: "#10b981" },
+                    { label: "Wins",   value: stats.current.wins,   color: "#f59e0b" },
                   ].map(s => (
                     <div key={s.label} className="glass rounded-xl p-3 text-center">
-                      <p className="text-xl font-black" style={{ color: s.color }}>{s.value}</p>
+                      <p className="text-2xl font-black" style={{ color: s.color }}>{s.value}</p>
                       <p className="text-xs text-white/30 mt-0.5">{s.label}</p>
                     </div>
                   ))}
@@ -177,9 +194,12 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
               </div>
             )}
 
-            {(stats.careerStats.wins !== null || stats.careerStats.races !== null) && (
+            {/* Career totals — only shown if API returns them */}
+            {stats.hasCareerStats && (
               <div className="glass-card rounded-2xl p-4">
-                <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">MotoGP Career</p>
+                <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
+                  Career Stats
+                </p>
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { label: "Races",   value: stats.careerStats.races   ?? "—", color: "white"   },
@@ -188,7 +208,7 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
                     { label: "Poles",   value: stats.careerStats.poles   ?? "—", color: "#8b5cf6" },
                   ].map(s => (
                     <div key={s.label} className="glass rounded-xl p-3 text-center">
-                      <p className="text-xl font-black" style={{ color: s.color }}>{s.value}</p>
+                      <p className="text-2xl font-black" style={{ color: s.color }}>{s.value}</p>
                       <p className="text-xs text-white/30 mt-0.5">{s.label}</p>
                     </div>
                   ))}
@@ -196,30 +216,37 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
               </div>
             )}
 
+            {/* Personal info */}
             <div className="glass-card rounded-2xl p-4">
-              <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">Profile</p>
+              <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
+                Profile
+              </p>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { label: "Age",          value: stats.age ? `${stats.age} yrs` : "—" },
+                  { label: "Nationality",  value: nat           || "—" },
                   { label: "Born",         value: stats.birthCity || "—" },
-                  { label: "MotoGP Since", value: stats.career.length
-                      ? stats.career[stats.career.length - 1].season : "—" },
+                  { label: "Date of Birth",value: dobStr         || "—" },
+                  { label: "MotoGP Debut", value: debut ? `${debut} season` : "—" },
                   { label: "Seasons",      value: stats.career.length || "—" },
+                  { label: "Bike #",       value: number ? `#${number}` : "—" },
                 ].map(s => (
                   <div key={s.label} className="glass rounded-xl p-3">
                     <p className="text-xs text-white/30">{s.label}</p>
-                    <p className="text-sm font-bold text-white mt-0.5">{s.value}</p>
+                    <p className="text-sm font-bold text-white mt-0.5 truncate">{s.value}</p>
                   </div>
                 ))}
               </div>
             </div>
 
+            {/* Career timeline */}
             {stats.career.length > 0 && (
               <div className="glass-card rounded-2xl p-4">
-                <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">MotoGP Career Timeline</p>
-                <div className="space-y-2">
+                <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
+                  MotoGP Seasons ({stats.career.length})
+                </p>
+                <div className="space-y-1.5">
                   {stats.career.map(c => {
-                    const teamColor = c.team?.color || "#f59e0b";
+                    const color     = c.team?.color || "#f59e0b";
                     const isCurrent = c.current;
                     return (
                       <div key={c.season}
@@ -227,21 +254,27 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
                           isCurrent ? "glass-strong ring-1 ring-yellow-400/30" : "glass"
                         }`}
                       >
-                        <span className="text-sm font-black text-white/60 w-10 flex-shrink-0">{c.season}</span>
+                        <span className="text-sm font-black text-white/50 w-10 flex-shrink-0 tabular-nums">
+                          {c.season}
+                        </span>
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           {c.team?.picture ? (
-                            <img src={c.team.picture} alt="" className="w-6 h-6 object-contain flex-shrink-0" />
+                            <img src={c.team.picture} alt=""
+                              className="w-5 h-5 object-contain flex-shrink-0" />
                           ) : (
-                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: teamColor }} />
+                            <div className="w-2 h-2 rounded-full flex-shrink-0"
+                              style={{ background: color }} />
                           )}
                           <span className="text-xs font-semibold text-white truncate">
-                            {c.sponsored_team || c.team?.name}
+                            {c.sponsored_team || c.team?.name || "—"}
                           </span>
                           {isCurrent && (
                             <span className="text-xs text-yellow-400/70 flex-shrink-0">Current</span>
                           )}
                         </div>
-                        <span className="text-xs font-bold text-white/40 flex-shrink-0">#{c.number}</span>
+                        <span className="text-xs font-bold text-white/35 flex-shrink-0">
+                          #{c.number}
+                        </span>
                       </div>
                     );
                   })}
