@@ -11,9 +11,9 @@ const TEAM_COLORS = {
   brawn:        "#99FF00", toyota:       "#CC0000", bmw_sauber:   "#1E90FF",
 };
 
-// Two shapes come in:
+// Two shapes:
 //   F1Page standings → s.Driver = { driverId, givenName, familyName, nationality, permanentNumber, dateOfBirth }
-//   FavouritesTab    → { id, name, number, nationality, sport, league }
+//   FavouritesTab    → { id, name, number, nationality, sport }
 function normalise(driver) {
   return {
     driverId:    driver.driverId || driver.id,
@@ -27,14 +27,13 @@ function normalise(driver) {
 async function fetchStats(driverId) {
   if (!driverId) return null;
   try {
-    const [winsRes, polesRes, p2Res, p3Res, racesRes, standingsRes] = await Promise.all([
+    const [winsRes, polesRes, p2Res, p3Res, racesRes, page1Res] = await Promise.all([
       fetch(`${JOLPICA}/drivers/${driverId}/results/1.json?limit=500`).then(r => r.json()),
       fetch(`${JOLPICA}/drivers/${driverId}/qualifying/1.json?limit=500`).then(r => r.json()),
       fetch(`${JOLPICA}/drivers/${driverId}/results/2.json?limit=500`).then(r => r.json()),
       fetch(`${JOLPICA}/drivers/${driverId}/results/3.json?limit=500`).then(r => r.json()),
       fetch(`${JOLPICA}/drivers/${driverId}/results.json?limit=1`).then(r => r.json()),
-      // Single call returns ALL seasons at once
-      fetch(`${JOLPICA}/drivers/${driverId}/driverStandings.json?limit=100`).then(r => r.json()),
+      fetch(`${JOLPICA}/drivers/${driverId}/driverStandings.json?limit=100&offset=0`).then(r => r.json()),
     ]);
 
     const wins    = parseInt(winsRes.MRData?.total   || 0);
@@ -44,8 +43,18 @@ async function fetchStats(driverId) {
     const races   = parseInt(racesRes.MRData?.total  || 0);
     const podiums = wins + p2s + p3s;
 
-    const standingsLists = standingsRes.MRData?.StandingsTable?.StandingsLists || [];
-    const seasons = standingsLists
+    const totalSeasons = parseInt(page1Res.MRData?.total || 0);
+    let allLists = page1Res.MRData?.StandingsTable?.StandingsLists || [];
+
+    // Fetch next page if driver has more than 100 seasons (future-proof)
+    if (totalSeasons > 100) {
+      const page2 = await fetch(
+        `${JOLPICA}/drivers/${driverId}/driverStandings.json?limit=100&offset=100`
+      ).then(r => r.json());
+      allLists = [...allLists, ...(page2.MRData?.StandingsTable?.StandingsLists || [])];
+    }
+
+    const seasons = allLists
       .map(list => {
         const s = list.DriverStandings?.[0];
         if (!s) return null;
@@ -54,7 +63,7 @@ async function fetchStats(driverId) {
           position: parseInt(s.position),
           points:   parseFloat(s.points),
           wins:     parseInt(s.wins),
-          team:     s.Constructors?.[0]?.name  || "—",
+          team:     s.Constructors?.[0]?.name          || "—",
           teamId:   s.Constructors?.[0]?.constructorId || "",
         };
       })
@@ -66,6 +75,7 @@ async function fetchStats(driverId) {
       winRate:  races > 0 ? ((wins  / races) * 100).toFixed(1) : "0.0",
       poleRate: races > 0 ? ((poles / races) * 100).toFixed(1) : "0.0",
       seasons,
+      totalSeasons,
     };
   } catch (err) {
     console.warn("F1 stats error:", err.message);
@@ -113,10 +123,8 @@ export default function F1DriverDetail({ driver, onClose }) {
             <span className="text-lg font-black text-red-400">{d.number || "F1"}</span>
           </div>
           <div className="min-w-0">
-            <h2
-              className="text-xl font-black text-white leading-tight truncate"
-              style={{ fontFamily: "'Space Grotesk',sans-serif" }}
-            >
+            <h2 className="text-xl font-black text-white leading-tight truncate"
+              style={{ fontFamily: "'Space Grotesk',sans-serif" }}>
               {d.name}
             </h2>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -244,6 +252,11 @@ export default function F1DriverDetail({ driver, onClose }) {
                     );
                   })}
                 </div>
+                {stats.totalSeasons > stats.seasons.length && (
+                  <p className="text-xs text-white/20 text-center mt-3">
+                    Showing {stats.seasons.length} of {stats.totalSeasons} seasons
+                  </p>
+                )}
               </div>
             )}
           </>
