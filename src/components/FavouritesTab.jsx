@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import useUserStore from "../store/userStore";
+import F1DriverDetail from "./F1DriverDetail";
+import MotoGPRiderDetail from "./MotoGPRiderDetail";
 
 const TOP_TEAMS = [
   { id: "eng.1", league: "Premier League", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", teams: [
@@ -27,6 +29,7 @@ const TOP_TEAMS = [
 ];
 
 const SOCCER_LEAGUES = ["eng.1", "esp.1", "ger.1", "ita.1", "fra.1"];
+
 
 async function searchFootballTeams(query) {
   const results = [];
@@ -433,6 +436,8 @@ function TeamPill({ team, leagueId, league }) {
 export default function FavouritesTab({ allGames, onPress }) {
   const { favorites, removeFavorite } = useUserStore();
   const [showSearch, setShowSearch] = useState(false);
+  const [selectedDriver, setSelectedDriver] = useState(null);
+
 
   // Football games for favourite teams
   const favGames = allGames.filter(game =>
@@ -450,10 +455,18 @@ export default function FavouritesTab({ allGames, onPress }) {
 
   // Show popular teams only if no favourites at all
   const showPopular = soccerFavs.length === 0;
+  
 
   return (
     <div className="pb-8">
       {showSearch && <TeamSearch onClose={() => setShowSearch(false)} />}
+
+    {selectedDriver?.sport === "f1" && (
+  <F1DriverDetail driver={selectedDriver} onClose={() => setSelectedDriver(null)} />
+)}
+{selectedDriver?.sport === "motogp" && (
+  <MotoGPRiderDetail rider={selectedDriver} onClose={() => setSelectedDriver(null)} />
+)}
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
@@ -573,8 +586,11 @@ export default function FavouritesTab({ allGames, onPress }) {
           </p>
           <div className="space-y-4">
             {motorFavs.map(fav => (
-              <div key={fav.id || fav.name}>
-                <div className="flex items-center gap-2 mb-2">
+          <div div key={fav.id || fav.name}>
+          <div
+      className="flex items-center gap-2 mb-2 cursor-pointer"
+      onClick={() => setSelectedDriver(fav)}
+    >
                   {fav.logo?.startsWith("http") ? (
                     <img src={fav.logo} alt="" className="w-6 h-6 object-contain rounded-full" />
                   ) : (
