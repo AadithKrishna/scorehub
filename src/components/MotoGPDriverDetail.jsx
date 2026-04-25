@@ -29,17 +29,40 @@ function normalise(rider) {
 async function fetchAll(rider) {
   const r = normalise(rider);
 
-  const [profileRes, standingsRes] = await Promise.allSettled([
-    fetch(mgp(`riders/${r.id}`)).then(res => res.json()),
+  // Fetch riders list + standings in parallel
+  // We need the riders list to get the correct profile ID
+  // because s.rider.id from standings is a different UUID
+  const [ridersRes, standingsRes] = await Promise.allSettled([
+    fetch(mgp(`riders?seasonYear=2026`)).then(res => res.json()),
     fetch(mgp(`results/standings?seasonUuid=${SEASON_UUID}&categoryUuid=${CATEGORY_UUID}`))
       .then(res => res.json()),
   ]);
 
-  const profile   = profileRes.status  === "fulfilled" ? profileRes.value  : null;
-  const standings = standingsRes.status === "fulfilled" ? standingsRes.value : null;
+  // Match the correct rider by number or name to get the right profile ID
+  const allRiders = Array.isArray(ridersRes.value) ? ridersRes.value : [];
+  const matched = allRiders.find(rd => {
+    const step = rd.current_career_step;
+    if (step?.number == r.number) return true;
+    const full = `${rd.name} ${rd.surname}`.toLowerCase();
+    return full === r.name.toLowerCase();
+  });
 
-  // Match by number first (reliable across both endpoints), fallback to name
-  const classification = standings?.classification || [];
+  // Use matched ID for profile fetch, fallback to original id
+  const profileId = matched?.id || r.id;
+  let profile = null;
+  try {
+    const res  = await fetch(mgp(`riders/${profileId}`));
+    const data = await res.json();
+    if (data && !data.error && (data.name || data.career)) {
+      profile = data;
+    }
+  } catch (e) {
+    console.warn("MotoGP profile fetch failed:", e.message);
+  }
+
+  // Match standing by number, fallback to name
+  const classification = standingsRes.status === "fulfilled"
+    ? (standingsRes.value?.classification || []) : [];
   let standing = classification.find(s => s.rider?.number == r.number);
   if (!standing && r.name) {
     standing = classification.find(s =>
