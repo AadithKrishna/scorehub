@@ -8,108 +8,101 @@ function mgp(path) {
   return `${MGP_PROXY}?path=${encodeURIComponent(path)}`;
 }
 
-// Two shapes:
-//   MotoGPPage standings → s.rider = { id, full_name, number, country:{name,iso,flag}, pictures }
-//   FavouritesTab        → { id, name, number, team, sport, logo }  ← no country, no full_name
+// Two shapes come in:
+//   MotoGPPage standings → s.rider = { id, full_name, number, country:{name,iso}, pictures:{profile:{main}} }
+//   FavouritesTab        → { id, name, number, team, sport, logo }
 function normalise(rider) {
   return {
-    id:     rider.id,
-    name:   rider.full_name || rider.name,
-    number: rider.number,
-    logo:   rider.pictures?.profile?.main || rider.logo || null,
+    id:          rider.id,
+    name:        rider.full_name || rider.name || "",
+    number:      rider.number,
+    nationality: rider.country?.name || null,
+    flagIso:     rider.country?.iso  || null,
+    photo:       rider.pictures?.profile?.main || rider.logo || null,
   };
 }
 
-async function fetchStats(riderId) {
+async function fetchProfile(riderId) {
   if (!riderId) return null;
-
-  const [profileRes, standingsRes] = await Promise.allSettled([
-    fetch(mgp(`riders/${riderId}`)).then(r => r.json()),
-    fetch(mgp(`results/standings?seasonUuid=${SEASON_UUID}&categoryUuid=${CATEGORY_UUID}`))
-      .then(r => r.json()),
-  ]);
-
-  const profile = profileRes.status === "fulfilled" ? profileRes.value : null;
-  if (!profile || profile.error) {
-    console.warn("MotoGP profile fetch failed for riderId:", riderId, profile);
+  try {
+    const res  = await fetch(mgp(`riders/${riderId}`));
+    const data = await res.json();
+    if (!data || data.error || (!data.name && !data.surname && !data.career)) {
+      console.warn("MotoGP /riders/ unexpected response for", riderId, data);
+      return null;
+    }
+    return data;
+  } catch (err) {
+    console.warn("MotoGP profile fetch error:", err.message);
     return null;
   }
+}
 
-  const career = (profile.career || [])
-    .filter(c => c.category?.name === "MotoGP")
-    .sort((a, b) => b.season - a.season);
+async function fetchStandings(riderId) {
+  try {
+    const res  = await fetch(mgp(`results/standings?seasonUuid=${SEASON_UUID}&categoryUuid=${CATEGORY_UUID}`));
+    const data = await res.json();
+    return (data.classification || []).find(s => s.rider?.id === riderId) || null;
+  } catch {
+    return null;
+  }
+}
 
-  const standings = standingsRes.status === "fulfilled" ? standingsRes.value : null;
-  const current   = (standings?.classification || []).find(s => s.rider?.id === riderId);
-
-  const cs = profile.career_stats;
-  const careerStats = {
-    races:   cs?.total_races   ?? null,
-    wins:    cs?.total_wins    ?? null,
-    podiums: cs?.total_podiums ?? null,
-    poles:   cs?.total_poles   ?? null,
-  };
-
-  const debut = career.length ? career[career.length - 1].season : null;
-
-  return {
-    // Always from API — identical regardless of which tab opened this
-    name:        `${profile.name} ${profile.surname}`.trim(),
-    nationality: profile.country?.name  || null,
-    flagUrl:     profile.country?.flag  || null,
-    birthDate:   profile.birth_date     || null,
-    birthCity:   profile.birth_city     || null,
-    age:         profile.years_old      || null,
-    number:      career[0]?.number      ?? null,
-    photo:       profile.current_career_step?.pictures?.profile?.main
-                 || profile.pictures?.profile?.main
-                 || null,
-    career,
-    debut,
-    careerStats,
-    hasCareerStats: Object.values(careerStats).some(v => v !== null),
-    current: current ? {
-      position: current.position,
-      points:   current.points,
-      wins:     current.race_wins,
-    } : null,
-  };
+function isoToFlag(iso) {
+  if (!iso || iso.length !== 2) return "";
+  return iso.toUpperCase().replace(/./g, c =>
+    String.fromCodePoint(c.charCodeAt(0) + 127397)
+  );
 }
 
 export default function MotoGPRiderDetail({ rider, onClose }) {
-  const [visible, setVisible] = useState(false);
-  const [stats,   setStats]   = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState(false);
+  const [visible,  setVisible]  = useState(false);
+  const [profile,  setProfile]  = useState(null);
+  const [standing, setStanding] = useState(null);
+  const [loading,  setLoading]  = useState(true);
 
   const r = normalise(rider);
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 10);
-    fetchStats(r.id)
-      .then(s => {
-        if (!s) setError(true);
-        setStats(s);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.warn("MotoGP detail error:", err);
-        setError(true);
-        setLoading(false);
-      });
+    Promise.all([
+      fetchProfile(r.id),
+      fetchStandings(r.id),
+    ]).then(([prof, stand]) => {
+      setProfile(prof);
+      setStanding(stand);
+      setLoading(false);
+    });
   }, []);
 
   function handleClose() { setVisible(false); setTimeout(onClose, 300); }
 
-  // Always use API values once loaded — consistent from both tabs
-  const name   = stats?.name       || r.name;
-  const nat    = stats?.nationality || null;
-  const flag   = stats?.flagUrl     || null;
-  const photo  = stats?.photo       || r.logo || null;
-  const number = stats?.number      || r.number;
+  // Use prop values directly — always correct from both tabs
+  // API is only used for career timeline, stats, and birth info
+  const name   = r.name   || (profile ? `${profile.name} ${profile.surname}`.trim() : "");
+  const photo  = r.photo  || profile?.current_career_step?.pictures?.profile?.main || null;
+  const number = r.number || profile?.career?.find(c => c.current)?.number || null;
+  const nat    = r.nationality || profile?.country?.name || null;
+  const flagUrl= profile?.country?.flag || null;
+  const age    = profile?.years_old || null;
 
-  const dobStr = stats?.birthDate
-    ? new Date(stats.birthDate).toLocaleDateString("en-US", {
+  const career = (profile?.career || [])
+    .filter(c => c.category?.name === "MotoGP")
+    .sort((a, b) => b.season - a.season);
+
+  const debut = career.length ? career[career.length - 1].season : null;
+
+  const cs = profile?.career_stats;
+  const careerStats = cs ? {
+    races:   cs.total_races   ?? null,
+    wins:    cs.total_wins    ?? null,
+    podiums: cs.total_podiums ?? null,
+    poles:   cs.total_poles   ?? null,
+  } : null;
+  const hasCareerStats = careerStats && Object.values(careerStats).some(v => v !== null);
+
+  const dobStr = profile?.birth_date
+    ? new Date(profile.birth_date).toLocaleDateString("en-US", {
         day: "numeric", month: "long", year: "numeric",
       })
     : null;
@@ -124,7 +117,7 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
         transition:     "transform 0.35s cubic-bezier(0.32,0.72,0,1)",
       }}
     >
-      {/* Header */}
+      {/* Header — uses prop values so correct immediately from both tabs */}
       <div className="flex items-center justify-between px-4 pt-12 pb-4 border-b border-white/6">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {photo ? (
@@ -143,10 +136,13 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
               {name}
             </h2>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              {flag   && <img src={flag} alt="" className="w-4 h-3 object-cover rounded-sm flex-shrink-0" />}
+              {flagUrl
+                ? <img src={flagUrl} alt="" className="w-4 h-3 object-cover rounded-sm flex-shrink-0" />
+                : r.flagIso && <span className="text-sm">{isoToFlag(r.flagIso)}</span>
+              }
               {nat    && <span className="text-xs text-white/40">{nat}</span>}
               {number && <span className="text-xs text-yellow-400/70">#{number}</span>}
-              {stats?.age && <span className="text-xs text-white/25">· {stats.age} yrs</span>}
+              {age    && <span className="text-xs text-white/25">· {age} yrs</span>}
             </div>
           </div>
         </div>
@@ -164,16 +160,10 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
                 style={{ animationDelay: `${i*80}ms` }} />
             ))}
           </div>
-        ) : error || !stats ? (
-          <div className="text-center py-16">
-            <p className="text-4xl mb-3">🏍️</p>
-            <p className="text-sm text-white/30">Stats unavailable</p>
-            <p className="text-xs text-white/15 mt-1">Check browser console for details</p>
-          </div>
         ) : (
           <>
             {/* 2026 Season */}
-            {stats.current && (
+            {standing && (
               <div className="glass-card rounded-2xl p-4">
                 <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
                   2026 Season
@@ -182,13 +172,13 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
                   {[
                     {
                       label: "Position",
-                      value: `P${stats.current.position}`,
-                      color: stats.current.position === 1 ? "#f59e0b" :
-                             stats.current.position === 2 ? "#cbd5e1" :
-                             stats.current.position === 3 ? "#92400e" : "white",
+                      value: `P${standing.position}`,
+                      color: standing.position === 1 ? "#f59e0b" :
+                             standing.position === 2 ? "#cbd5e1" :
+                             standing.position === 3 ? "#92400e" : "white",
                     },
-                    { label: "Points", value: stats.current.points, color: "#10b981" },
-                    { label: "Wins",   value: stats.current.wins,   color: "#f59e0b" },
+                    { label: "Points", value: standing.points,    color: "#10b981" },
+                    { label: "Wins",   value: standing.race_wins, color: "#f59e0b" },
                   ].map(s => (
                     <div key={s.label} className="glass rounded-xl p-3 text-center">
                       <p className="text-2xl font-black" style={{ color: s.color }}>{s.value}</p>
@@ -199,18 +189,18 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
               </div>
             )}
 
-            {/* Career totals — only if API returns them */}
-            {stats.hasCareerStats && (
+            {/* Career totals */}
+            {hasCareerStats && (
               <div className="glass-card rounded-2xl p-4">
                 <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
                   Career Stats
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { label: "Races",   value: stats.careerStats.races   ?? "—", color: "white"   },
-                    { label: "Wins",    value: stats.careerStats.wins    ?? "—", color: "#f59e0b" },
-                    { label: "Podiums", value: stats.careerStats.podiums ?? "—", color: "#10b981" },
-                    { label: "Poles",   value: stats.careerStats.poles   ?? "—", color: "#8b5cf6" },
+                    { label: "Races",   value: careerStats.races   ?? "—", color: "white"   },
+                    { label: "Wins",    value: careerStats.wins    ?? "—", color: "#f59e0b" },
+                    { label: "Podiums", value: careerStats.podiums ?? "—", color: "#10b981" },
+                    { label: "Poles",   value: careerStats.poles   ?? "—", color: "#8b5cf6" },
                   ].map(s => (
                     <div key={s.label} className="glass rounded-xl p-3 text-center">
                       <p className="text-2xl font-black" style={{ color: s.color }}>{s.value}</p>
@@ -223,17 +213,15 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
 
             {/* Profile */}
             <div className="glass-card rounded-2xl p-4">
-              <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
-                Profile
-              </p>
+              <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">Profile</p>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { label: "Nationality",   value: nat                || "—" },
-                  { label: "Hometown",      value: stats.birthCity    || "—" },
-                  { label: "Date of Birth", value: dobStr             || "—" },
-                  { label: "MotoGP Debut",  value: stats.debut ? `${stats.debut} season` : "—" },
-                  { label: "Seasons",       value: stats.career.length || "—" },
-                  { label: "Bike #",        value: number ? `#${number}` : "—" },
+                  { label: "Nationality",   value: nat                        || "—" },
+                  { label: "Hometown",      value: profile?.birth_city        || "—" },
+                  { label: "Date of Birth", value: dobStr                     || "—" },
+                  { label: "MotoGP Debut",  value: debut ? `${debut} season`  : "—" },
+                  { label: "Seasons",       value: career.length              || "—" },
+                  { label: "Bike #",        value: number ? `#${number}`      : "—" },
                 ].map(s => (
                   <div key={s.label} className="glass rounded-xl p-3">
                     <p className="text-xs text-white/30">{s.label}</p>
@@ -244,13 +232,13 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
             </div>
 
             {/* Career timeline */}
-            {stats.career.length > 0 && (
+            {career.length > 0 && (
               <div className="glass-card rounded-2xl p-4">
                 <p className="text-xs text-white/30 font-semibold uppercase tracking-widest mb-3">
-                  MotoGP Seasons ({stats.career.length})
+                  MotoGP Seasons ({career.length})
                 </p>
                 <div className="space-y-1.5">
-                  {stats.career.map(c => {
+                  {career.map(c => {
                     const color     = c.team?.color || "#f59e0b";
                     const isCurrent = c.current;
                     return (
@@ -284,6 +272,12 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {!profile && !standing && (
+              <div className="text-center py-8">
+                <p className="text-sm text-white/20">No additional data available</p>
               </div>
             )}
           </>

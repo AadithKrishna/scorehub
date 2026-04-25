@@ -110,7 +110,14 @@ function RiderStandings({ onSelectRider }) {
   key={s.id}
   className="glass-card rounded-2xl px-4 py-3 flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-transform"
   style={isTop3 ? { borderLeft: `3px solid ${color}` } : {}}
-  onClick={() => onSelectRider?.(s.rider)}
+  onClick={() => onSelectRider?.({
+  id:      s.rider?.id,
+  name:    s.rider?.full_name,
+  number:  s.rider?.number,
+  logo:    s.rider?.pictures?.profile?.main || null,
+  country: s.rider?.country,
+  sport:   "motogp",
+})}
 >
             <span className={`text-lg font-black w-6 text-center tabular-nums ${
               s.position === 1 ? "text-yellow-400" :

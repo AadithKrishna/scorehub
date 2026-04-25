@@ -85,14 +85,19 @@ async function searchMotoGPRiders(query) {
     })
     .filter(r => r.current_career_step?.category?.name === "MotoGP")
     .map(r => ({
-      id: r.id,
-      name: `${r.name} ${r.surname}`,
-      logo: r.current_career_step?.pictures?.profile?.main || null,
-      number: r.current_career_step?.number,
-      team: r.current_career_step?.sponsored_team,
-      sport: "motogp",
-      league: "MotoGP",
-    }));
+  id:      r.id,
+  name:    `${r.name} ${r.surname}`,
+  logo:    r.current_career_step?.pictures?.profile?.main || null,
+  number:  r.current_career_step?.number,
+  team:    r.current_career_step?.sponsored_team,
+  sport:   "motogp",
+  league:  "MotoGP",
+  // Store country so detail page shows flag/nationality consistently
+  country: {
+    name: r.country?.name || null,
+    iso:  r.country?.iso  || null,
+  },
+}));
 }
 
 async function fetchNextEvent(fav) {
