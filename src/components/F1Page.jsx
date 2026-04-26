@@ -506,7 +506,7 @@ function RaceDetail({ race, onClose }) {
     <div
       className="fixed inset-0 z-50 flex flex-col"
       style={{
-        background: "rgba(7, 10, 18, 0.98)",
+        background: "var(--overlay-bg)",
         backdropFilter: "blur(30px)",
         transform: visible ? "translateY(0)" : "translateY(100%)",
         transition: "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)",

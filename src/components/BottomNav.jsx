@@ -9,7 +9,7 @@ export default function BottomNav({ active, onSelect }) {
 
   return (
     <nav className="bottom-nav">
-      <div className="flex items-center justify-around px-1 py-1.5 max-w-xl mx-auto">
+      <div className="flex items-center justify-around px-1 py-2 max-w-xl mx-auto">
         {tabs.map((tab) => {
           const isActive = active === tab.id;
           return (
@@ -19,23 +19,21 @@ export default function BottomNav({ active, onSelect }) {
               className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all duration-150"
               style={isActive ? { background: "rgba(0,122,255,0.1)" } : {}}
             >
-              <span
-                className="text-xl leading-none"
-                style={{
-                  opacity: isActive ? 1 : 0.4,
-                  transform: isActive ? "scale(1.05)" : "scale(1)",
-                  transition: "all 0.15s ease",
-                }}
-              >
+              <span style={{
+                fontSize: 20,
+                lineHeight: 1,
+                opacity: isActive ? 1 : 0.38,
+                transform: isActive ? "scale(1.08)" : "scale(1)",
+                transition: "all 0.15s ease",
+              }}>
                 {tab.icon}
               </span>
-              <span
-                className="text-xs font-semibold"
-                style={{
-                  color: isActive ? "#007aff" : "#8e8e93",
-                  transition: "color 0.15s ease",
-                }}
-              >
+              <span style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: isActive ? "var(--accent)" : "var(--text-3)",
+                transition: "color 0.15s ease",
+              }}>
                 {tab.label}
               </span>
             </button>
