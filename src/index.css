@@ -6,44 +6,47 @@
 
 /* ── Tokens ── */
 :root {
-  --bg:              #f2f2f7;
-  --bg-2:            #ffffff;
-  --bg-3:            #e8e8ed;
-  --surface:         #ffffff;
-  --surface-2:       #f2f2f7;
-  --border:          rgba(0,0,0,0.08);
-  --border-2:        rgba(0,0,0,0.12);
-  --text-1:          #000000;
-  --text-2:          #3a3a3c;
-  --text-3:          #6c6c70;
-  --text-4:          #aeaeb2;
-  --overlay-bg:      rgba(242,242,247,0.98);
-  --shadow-sm:       0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md:       0 4px 16px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
-  --accent:          #007aff;
-  --live:            #ff3b30;
-  --nav-bg:          rgba(242,242,247,0.94);
+  --bg:          #f2f2f7;
+  --surface:     #ffffff;
+  --surface-2:   #f2f2f7;
+  --surface-3:   #e5e5ea;
+  --border:      rgba(0,0,0,0.07);
+  --border-2:    rgba(0,0,0,0.12);
+  --text-1:      #000000;
+  --text-2:      #3a3a3c;
+  --text-3:      #6c6c70;
+  --text-4:      #aeaeb2;
+  --accent:      #007aff;
+  --live:        #ff3b30;
+  --overlay-bg:  #f2f2f7;
+  --shadow-sm:   0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:   0 4px 16px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg:   0 8px 32px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.05);
+  --nav-bg:      rgba(242,242,247,0.94);
+  --radius-sm:   10px;
+  --radius-md:   14px;
+  --radius-lg:   18px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg:              #000000;
-    --bg-2:            #1c1c1e;
-    --bg-3:            #2c2c2e;
-    --surface:         #1c1c1e;
-    --surface-2:       #2c2c2e;
-    --border:          rgba(255,255,255,0.08);
-    --border-2:        rgba(255,255,255,0.13);
-    --text-1:          #ffffff;
-    --text-2:          #ebebf0;
-    --text-3:          #8e8e93;
-    --text-4:          #48484a;
-    --overlay-bg:      rgba(0,0,0,0.98);
-    --shadow-sm:       0 1px 3px rgba(0,0,0,0.4);
-    --shadow-md:       0 4px 16px rgba(0,0,0,0.5);
-    --accent:          #0a84ff;
-    --live:            #ff453a;
-    --nav-bg:          rgba(0,0,0,0.94);
+    --bg:          #000000;
+    --surface:     #1c1c1e;
+    --surface-2:   #2c2c2e;
+    --surface-3:   #3a3a3c;
+    --border:      rgba(255,255,255,0.08);
+    --border-2:    rgba(255,255,255,0.14);
+    --text-1:      #ffffff;
+    --text-2:      #ebebf0;
+    --text-3:      #8e8e93;
+    --text-4:      #48484a;
+    --accent:      #0a84ff;
+    --live:        #ff453a;
+    --overlay-bg:  #000000;
+    --shadow-sm:   0 1px 3px rgba(0,0,0,0.5);
+    --shadow-md:   0 4px 16px rgba(0,0,0,0.6);
+    --shadow-lg:   0 8px 32px rgba(0,0,0,0.7);
+    --nav-bg:      rgba(0,0,0,0.94);
   }
 }
 
@@ -69,7 +72,7 @@ body {
 }
 
 .glass-strong {
-  background: var(--surface);
+  background: var(--surface-2);
   border: 1px solid var(--border-2);
   box-shadow: var(--shadow-md);
 }
@@ -80,7 +83,7 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
-/* ── Adaptive text ── */
+/* ── Remap white text → adaptive ── */
 .text-white           { color: var(--text-1) !important; }
 .text-white\/80       { color: var(--text-2) !important; }
 .text-white\/60       { color: var(--text-2) !important; }
@@ -93,17 +96,19 @@ body {
 .text-white\/15       { color: var(--text-4) !important; }
 .text-white\/10       { color: var(--text-4) !important; }
 
-/* ── Adaptive backgrounds ── */
-.bg-white\/10                  { background: var(--surface-2) !important; }
-.bg-white\/8                   { background: var(--surface-2) !important; }
-.bg-white\/5                   { background: var(--surface-2) !important; }
-.hover\:bg-white\/10:hover     { background: var(--surface-2) !important; }
-.hover\:bg-white\/5:hover      { background: var(--surface-2) !important; }
-.active\:bg-white\/10:active   { background: var(--surface-2) !important; }
+/* ── Remap white backgrounds → adaptive ── */
+.bg-white\/10                { background: var(--surface-2) !important; }
+.bg-white\/8                 { background: var(--surface-2) !important; }
+.bg-white\/5                 { background: var(--surface-2) !important; }
+.bg-white\/4                 { background: var(--surface-2) !important; }
+.hover\:bg-white\/10:hover   { background: var(--surface-2) !important; }
+.hover\:bg-white\/5:hover    { background: var(--surface-2) !important; }
+.hover\:bg-white\/4:hover    { background: var(--surface-2) !important; }
 
-/* ── Adaptive borders ── */
+/* ── Remap white borders → adaptive ── */
 .border-white\/8  { border-color: var(--border) !important; }
 .border-white\/6  { border-color: var(--border) !important; }
+.border-white\/5  { border-color: var(--border) !important; }
 
 /* ── Bottom nav ── */
 .bottom-nav {

@@ -7,14 +7,8 @@ function TeamLogo({ logo, name }) {
 
   const getColor = (str = "") => {
     const colors = [
-      ["#6366f1", "#4f46e5"],
-      ["#ec4899", "#db2777"],
-      ["#14b8a6", "#0d9488"],
-      ["#f59e0b", "#d97706"],
-      ["#3b82f6", "#2563eb"],
-      ["#10b981", "#059669"],
-      ["#ef4444", "#dc2626"],
-      ["#8b5cf6", "#7c3aed"],
+      "#6366f1", "#ec4899", "#14b8a6", "#f59e0b",
+      "#3b82f6", "#10b981", "#ef4444", "#8b5cf6",
     ];
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
@@ -23,15 +17,15 @@ function TeamLogo({ logo, name }) {
     return colors[Math.abs(hash) % colors.length];
   };
 
-  const [bg] = getColor(name);
-  const initials = name
-    ?.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "??";
+  const color = getColor(name);
+  const initials = name?.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "??";
 
   if (isUrl) {
     return (
-      <div className="w-8 h-8 rounded-lg glass-strong flex items-center justify-center flex-shrink-0 overflow-hidden p-1">
-
-
+      <div
+        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden p-1"
+        style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
+      >
         <img
           src={logo}
           alt={name}
@@ -39,7 +33,7 @@ function TeamLogo({ logo, name }) {
           onError={(e) => {
             e.target.style.display = "none";
             e.target.parentElement.innerHTML =
-              `<span style="font-size:10px;font-weight:800;color:${bg}">${initials}</span>`;
+              `<span style="font-size:10px;font-weight:800;color:${color}">${initials}</span>`;
           }}
         />
       </div>
@@ -48,23 +42,21 @@ function TeamLogo({ logo, name }) {
 
   if (isEmoji) {
     return (
-      <div className="w-8 h-8 rounded-xl glass-strong flex items-center justify-center flex-shrink-0">
-        <span className="text-lg">{logo}</span>
+      <div
+        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+        style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
+      >
+        <span className="text-base">{logo}</span>
       </div>
     );
   }
 
   return (
     <div
-      className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-      style={{
-        background: `linear-gradient(135deg, ${bg}25, ${bg}10)`,
-        border: `1px solid ${bg}40`,
-      }}
+      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+      style={{ background: `${color}18`, border: `1px solid ${color}30` }}
     >
-      <span className="text-xs font-black" style={{ color: bg }}>
-        {initials}
-      </span>
+      <span className="text-xs font-bold" style={{ color }}>{initials}</span>
     </div>
   );
 }
@@ -75,7 +67,10 @@ function ScoreDisplay({ homeScore, awayScore, isFinished, isScheduled }) {
 
   if (isScheduled) {
     return (
-      <span className="text-xs font-semibold text-white/25 uppercase tracking-widest">
+      <span
+        className="text-xs font-semibold uppercase tracking-widest"
+        style={{ color: "var(--text-4)" }}
+      >
         vs
       </span>
     );
@@ -84,42 +79,52 @@ function ScoreDisplay({ homeScore, awayScore, isFinished, isScheduled }) {
   if (isStringScore) {
     return (
       <div className="flex flex-col items-center gap-1 w-32">
-        <div className="w-full glass-strong rounded-lg px-2 py-1 text-center">
-          <p className="text-xs font-bold text-white tabular-nums">
+        <div
+          className="w-full rounded-lg px-2 py-1 text-center"
+          style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
+        >
+          <p className="text-xs font-bold tabular-nums" style={{ color: "var(--text-1)" }}>
             {homeScore ?? "Yet to bat"}
           </p>
         </div>
-        <span className="text-xs text-white/20">vs</span>
-        <div className="w-full glass-strong rounded-lg px-2 py-1 text-center">
-          <p className="text-xs font-bold text-white tabular-nums">
+        <span className="text-xs" style={{ color: "var(--text-4)" }}>vs</span>
+        <div
+          className="w-full rounded-lg px-2 py-1 text-center"
+          style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
+        >
+          <p className="text-xs font-bold tabular-nums" style={{ color: "var(--text-1)" }}>
             {awayScore ?? "Yet to bat"}
           </p>
         </div>
         {isFinished && (
-          <span className="text-xs text-white/20">Full Time</span>
+          <span className="text-xs" style={{ color: "var(--text-4)" }}>Full Time</span>
         )}
       </div>
     );
   }
 
-  const homeWin = !isFinished && homeScore > awayScore;
-  const awayWin = !isFinished && awayScore > homeScore;
+  const homeWin = isFinished && homeScore > awayScore;
+  const awayWin = isFinished && awayScore > homeScore;
 
   return (
     <div className="flex flex-col items-center gap-0.5">
       <div className="flex items-center gap-2">
-        <span className={`text-lg font-black tabular-nums tracking-tight
-          ${homeWin ? "score-glow text-white" : "text-white/40"}`}>
+        <span
+          className="text-lg font-black tabular-nums tracking-tight"
+          style={{ color: homeWin ? "var(--text-1)" : "var(--text-4)" }}
+        >
           {homeScore ?? 0}
         </span>
-        <span className="text-white/15 text-sm">—</span>
-        <span className={`text-lg font-black tabular-nums tracking-tight
-          ${awayWin ? "score-glow text-white" : "text-white/40"}`}>
+        <span className="text-sm" style={{ color: "var(--text-4)" }}>—</span>
+        <span
+          className="text-lg font-black tabular-nums tracking-tight"
+          style={{ color: awayWin ? "var(--text-1)" : "var(--text-4)" }}
+        >
           {awayScore ?? 0}
         </span>
       </div>
       {isFinished && (
-        <span className="text-xs text-white/20">FT</span>
+        <span className="text-xs" style={{ color: "var(--text-4)" }}>FT</span>
       )}
     </div>
   );
@@ -127,21 +132,37 @@ function ScoreDisplay({ homeScore, awayScore, isFinished, isScheduled }) {
 
 function StatusBadge({ status, minute }) {
   if (status === "live") return (
-    <div className="flex items-center gap-1 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-full">
+    <div
+      className="flex items-center gap-1 px-2 py-0.5 rounded-full"
+      style={{
+        background: "rgba(255,59,48,0.1)",
+        border: "1px solid rgba(255,59,48,0.2)",
+      }}
+    >
       <div className="relative flex items-center justify-center w-1.5 h-1.5">
-        <span className="live-ring absolute inline-flex w-1.5 h-1.5 rounded-full bg-red-400" />
-        <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+        <span className="live-ring absolute inline-flex w-1.5 h-1.5 rounded-full bg-red-500" />
+        <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
       </div>
-      <span className="text-xs font-bold text-red-400 tabular-nums">{minute}</span>
+      <span className="text-xs font-bold tabular-nums" style={{ color: "var(--live)" }}>
+        {minute}
+      </span>
     </div>
   );
+
   if (status === "finished") return (
-    <span className="text-xs font-semibold text-white/20 bg-white/5 px-2 py-0.5 rounded-full">
+    <span
+      className="text-xs font-semibold px-2 py-0.5 rounded-full"
+      style={{ color: "var(--text-4)", background: "var(--surface-2)" }}
+    >
       FT
     </span>
   );
+
   return (
-    <span className="text-xs font-semibold text-blue-400/60 bg-blue-500/8 px-2 py-0.5 rounded-full">
+    <span
+      className="text-xs font-semibold px-2 py-0.5 rounded-full"
+      style={{ color: "var(--accent)", background: "rgba(0,122,255,0.08)" }}
+    >
       {minute}
     </span>
   );
@@ -149,20 +170,14 @@ function StatusBadge({ status, minute }) {
 
 function FavButton({ game, onShowPicker }) {
   const { isFavorite } = useUserStore();
-  const isFavHome = isFavorite(game.homeTeam?.name);
-  const isFavAway = isFavorite(game.awayTeam?.name);
-  const isFav = isFavHome || isFavAway;
+  const isFav = isFavorite(game.homeTeam?.name) || isFavorite(game.awayTeam?.name);
 
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onShowPicker?.(); }}
-      className="transition-all duration-200 hover:scale-110 active:scale-90 p-0.5"
+      className="transition-all duration-200 active:scale-90 p-0.5"
     >
-      <span className={`text-xs transition-all duration-200 ${
-        isFav ? "opacity-100" : "opacity-20 hover:opacity-50"
-      }`}>
-        ⭐
-      </span>
+      <span style={{ fontSize: 12, opacity: isFav ? 1 : 0.25 }}>⭐</span>
     </button>
   );
 }
@@ -188,16 +203,28 @@ function TeamFavPicker({ game, onClose }) {
   ];
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center"
-      onClick={onClose}>
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+    <div
+      className="fixed inset-0 z-[80] flex items-end justify-center"
+      onClick={onClose}
+    >
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div
         className="relative w-full max-w-xl rounded-t-3xl p-6 pb-10"
-        style={{ background: "rgba(15, 18, 30, 0.98)", backdropFilter: "blur(40px)", border: "1px solid rgba(255,255,255,0.1)" }}
+        style={{
+          background: "var(--surface)",
+          borderTop: "1px solid var(--border)",
+          boxShadow: "var(--shadow-lg)",
+        }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-5" />
-        <p className="text-sm font-bold text-white/50 text-center mb-4 uppercase tracking-widest">
+        <div
+          className="w-10 h-1 rounded-full mx-auto mb-5"
+          style={{ background: "var(--surface-3)" }}
+        />
+        <p
+          className="text-xs font-bold text-center mb-4 uppercase tracking-widest"
+          style={{ color: "var(--text-3)" }}
+        >
           Follow Team
         </p>
         <div className="space-y-3">
@@ -207,24 +234,39 @@ function TeamFavPicker({ game, onClose }) {
               <button
                 key={team.id}
                 onClick={() => { toggleFavoriteTeam(team); onClose(); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all ${
-                  fav ? "glass-strong ring-1 ring-yellow-400/40" : "glass"
-                }`}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all"
+                style={{
+                  background: fav ? "rgba(0,122,255,0.06)" : "var(--surface-2)",
+                  border: `1px solid ${fav ? "rgba(0,122,255,0.2)" : "var(--border)"}`,
+                }}
               >
                 {team.logo?.startsWith("http") ? (
                   <img src={team.logo} alt="" className="w-10 h-10 object-contain flex-shrink-0" />
                 ) : (
-                  <div className="w-10 h-10 rounded-xl glass-strong flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-black text-white/50">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: "var(--surface-3)" }}
+                  >
+                    <span
+                      className="text-xs font-black"
+                      style={{ color: "var(--text-3)" }}
+                    >
                       {team.name?.slice(0, 2).toUpperCase()}
                     </span>
                   </div>
                 )}
                 <div className="flex-1 text-left">
-                  <p className="text-sm font-bold text-white">{team.name}</p>
-                  <p className="text-xs text-white/30">{team.league}</p>
+                  <p
+                    className="text-sm font-bold"
+                    style={{ color: "var(--text-1)" }}
+                  >
+                    {team.name}
+                  </p>
+                  <p className="text-xs" style={{ color: "var(--text-3)" }}>
+                    {team.league}
+                  </p>
                 </div>
-                <span className={`text-lg ${fav ? "opacity-100" : "opacity-20"}`}>
+                <span style={{ fontSize: 18, opacity: fav ? 1 : 0.2 }}>
                   {fav ? "⭐" : "☆"}
                 </span>
               </button>
@@ -243,30 +285,33 @@ export default function MatchCard({
   showLeague = true,
   onPress,
 }) {
-  const [pressed, setPressed] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const isFinished = game.status === "finished";
   const isScheduled = game.status === "scheduled";
 
   return (
     <div
-      onMouseDown={() => setPressed(true)}
-      onMouseUp={() => setPressed(false)}
-      onMouseLeave={() => setPressed(false)}
       onClick={() => onPress?.(game)}
-      style={{ animationDelay: `${index * 40}ms` }}
-      className={`glass-card card-hover rounded-xl px-3 py-2 cursor-pointer
-        ${pressed ? "scale-[0.99] opacity-80" : ""}
-        ${highlighted ? "ring-2 ring-violet-500/70" : ""}
-        transition-all duration-150
-      `}
+      style={{
+        animationDelay: `${index * 40}ms`,
+        background: "var(--surface)",
+        border: `1px solid ${highlighted ? "var(--accent)" : "var(--border)"}`,
+        borderRadius: 12,
+        boxShadow: "var(--shadow-sm)",
+        cursor: "pointer",
+        transition: "transform 0.15s ease",
+      }}
+      className={`animate-card px-3 py-2.5 active:scale-[0.988]`}
     >
       {/* League row */}
       {showLeague && (
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5 flex-1 min-w-0 mr-2">
             <span className="text-sm flex-shrink-0">{game.leagueLogo}</span>
-            <span className="text-xs text-white/30 font-semibold uppercase tracking-widest truncate">
+            <span
+              className="text-xs font-semibold uppercase tracking-widest truncate"
+              style={{ color: "var(--text-4)" }}
+            >
               {game.league}
             </span>
           </div>
@@ -279,11 +324,13 @@ export default function MatchCard({
 
       {/* Teams + Score */}
       <div className="flex items-center gap-2">
-
         {/* Home */}
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <TeamLogo logo={game.homeTeam.logo} name={game.homeTeam.name} />
-          <p className="text-sm font-semibold text-white/85 leading-tight truncate">
+          <p
+            className="text-sm font-semibold leading-tight truncate"
+            style={{ color: "var(--text-1)" }}
+          >
             {game.homeTeam.shortName || game.homeTeam.name}
           </p>
         </div>
@@ -300,42 +347,45 @@ export default function MatchCard({
 
         {/* Away */}
         <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-          <p className="text-sm font-semibold text-white/85 leading-tight truncate text-right">
+          <p
+            className="text-sm font-semibold leading-tight truncate text-right"
+            style={{ color: "var(--text-1)" }}
+          >
             {game.awayTeam.shortName || game.awayTeam.name}
           </p>
           <TeamLogo logo={game.awayTeam.logo} name={game.awayTeam.name} />
         </div>
-
       </div>
 
       {/* Status row when grouped */}
       {!showLeague && (
-        <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-white/5">
+        <div
+          className="flex items-center justify-between mt-2 pt-1.5"
+          style={{ borderTop: "1px solid var(--border)" }}
+        >
           <FavButton game={game} onShowPicker={() => setShowPicker(true)} />
-          {game.status === "live" && (
-            <StatusBadge status={game.status} minute={game.minute} />
-          )}
-          {game.status === "scheduled" && (
-            <span className="text-xs text-blue-400/60">{game.minute}</span>
-          )}
-          {game.status === "finished" && (
-            <span className="text-xs text-white/20">FT</span>
-          )}
+          <StatusBadge status={game.status} minute={game.minute} />
         </div>
       )}
 
       {/* Events */}
       {game.events?.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-white/5 flex flex-wrap gap-1.5">
+        <div
+          className="mt-2 pt-2 flex flex-wrap gap-1.5"
+          style={{ borderTop: "1px solid var(--border)" }}
+        >
           {game.events.slice(0, 3).map((e, i) => (
-            <span key={i} className="text-xs text-white/25 bg-white/4 px-2 py-0.5 rounded-full">
+            <span
+              key={i}
+              className="text-xs px-2 py-0.5 rounded-full"
+              style={{ color: "var(--text-4)", background: "var(--surface-2)" }}
+            >
               ⚽ {e.minute} {e.player}
             </span>
           ))}
         </div>
       )}
 
-      {/* Team picker */}
       {showPicker && (
         <TeamFavPicker game={game} onClose={() => setShowPicker(false)} />
       )}

@@ -13,7 +13,10 @@ export default function Header({ onSearch, showSearch = true }) {
         <div>
           <h1
             className="text-lg font-bold tracking-tight"
-            style={{ fontFamily: "'Space Grotesk', sans-serif", color: "var(--text-1)" }}
+            style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              color: "var(--text-1)",
+            }}
           >
             ScoreHub
           </h1>
@@ -27,14 +30,14 @@ export default function Header({ onSearch, showSearch = true }) {
         {showSearch && (
           <button
             onClick={onSearch}
-            className="w-9 h-9 rounded-full flex items-center justify-center"
+            className="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
             style={{ background: "var(--surface-2)" }}
           >
             <span style={{ fontSize: 15 }}>🔍</span>
           </button>
         )}
         <button
-          className="w-9 h-9 rounded-full flex items-center justify-center relative"
+          className="w-9 h-9 rounded-full flex items-center justify-center relative transition-colors"
           style={{ background: "var(--surface-2)" }}
         >
           <Bell size={16} style={{ color: "var(--text-2)" }} />
