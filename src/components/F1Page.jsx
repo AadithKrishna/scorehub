@@ -256,11 +256,11 @@ function PracticeSchedule({ race }) {
   const hasSprint = !!race.Sprint;
 
   const sessions = (hasSprint ? [
-    { name: "Practice 1",        short: "FP1",  date: race.FirstPractice?.date,  time: race.FirstPractice?.time,  color: null      },
-    { name: "Sprint Qualifying", short: "SQ",   date: race.SecondPractice?.date, time: race.SecondPractice?.time, color: "#fb923c" },
-    { name: "Sprint Race",       short: "SPR",  date: race.Sprint?.date,         time: race.Sprint?.time,         color: "#f97316" },
-    { name: "Qualifying",        short: "QUAL", date: race.Qualifying?.date,     time: race.Qualifying?.time,     color: "#8b5cf6" },
-    { name: "Race",              short: "RACE", date: race.date,                 time: race.time,                 color: "#ef4444" },
+  { name: "Practice 1",        short: "FP1",  date: race.FirstPractice?.date,   time: race.FirstPractice?.time,   color: null      },
+  { name: "Sprint Qualifying", short: "SQ",   date: race.SecondPractice?.date,  time: race.SecondPractice?.time,  color: "#fb923c" },
+  { name: "Sprint Race",       short: "SPR",  date: race.Sprint?.date,          time: race.Sprint?.time,          color: "#f97316" },
+  { name: "Qualifying",        short: "QUAL", date: race.ThirdPractice?.date,   time: race.ThirdPractice?.time,   color: "#8b5cf6" },
+  { name: "Race",              short: "RACE", date: race.date,                  time: race.time,                  color: "#ef4444" },
   ] : [
     { name: "Practice 1",  short: "FP1",  date: race.FirstPractice?.date,  time: race.FirstPractice?.time,  color: null      },
     { name: "Practice 2",  short: "FP2",  date: race.SecondPractice?.date, time: race.SecondPractice?.time, color: null      },
@@ -449,16 +449,20 @@ function RaceDetail({ race, onClose }) {
     setLoading(true);
     try {
       const fetches = [
-        fetch(`${JOLPICA}/2026/${race.round}/results.json`).then(r => r.json()),
-        fetch(`${JOLPICA}/2026/${race.round}/qualifying.json`).then(r => r.json()),
-      ];
-      if (hasSprint) fetches.push(fetch(`${JOLPICA}/2026/${race.round}/sprint.json`).then(r => r.json()));
-      const settled = await Promise.allSettled(fetches);
-      setResults({
-        race:      settled[0]?.status === "fulfilled" ? settled[0].value.MRData?.RaceTable?.Races?.[0]?.Results          || [] : [],
-        qualifying:settled[1]?.status === "fulfilled" ? settled[1].value.MRData?.RaceTable?.Races?.[0]?.QualifyingResults || [] : [],
-        sprint:    hasSprint && settled[2]?.status === "fulfilled" ? settled[2].value.MRData?.RaceTable?.Races?.[0]?.SprintResults || [] : [],
-      });
+  fetch(`${JOLPICA}/2026/${race.round}/results.json`).then(r => r.json()),
+  fetch(`${JOLPICA}/2026/${race.round}/qualifying.json`).then(r => r.json()),
+];
+if (hasSprint) {
+  fetches.push(fetch(`${JOLPICA}/2026/${race.round}/sprint.json`).then(r => r.json()));
+  fetches.push(fetch(`${JOLPICA}/2026/${race.round}/sprintQualifying.json`).then(r => r.json()));
+}
+const settled = await Promise.allSettled(fetches);
+setResults({
+  race:       settled[0]?.status === "fulfilled" ? settled[0].value.MRData?.RaceTable?.Races?.[0]?.Results              || [] : [],
+  qualifying: settled[1]?.status === "fulfilled" ? settled[1].value.MRData?.RaceTable?.Races?.[0]?.QualifyingResults    || [] : [],
+  sprint:     hasSprint && settled[2]?.status === "fulfilled" ? settled[2].value.MRData?.RaceTable?.Races?.[0]?.SprintResults         || [] : [],
+  sprintQual: hasSprint && settled[3]?.status === "fulfilled" ? settled[3].value.MRData?.RaceTable?.Races?.[0]?.SprintQualifyingResults || [] : [],
+});
     } catch {}
     setLoading(false);
   }
@@ -560,11 +564,7 @@ function RaceDetail({ race, onClose }) {
         ) : activeTab === "sprint" ? (
           <RaceResults list={results.sprint} />
         ) : activeTab === "sprintQual" ? (
-          <div className="text-center py-12">
-            <p className="text-4xl mb-3">⚡</p>
-            <p className="text-sm font-medium" style={{ color: "var(--text-3)" }}>Sprint Qualifying results</p>
-            <p className="text-xs mt-1" style={{ color: "var(--text-4)" }}>Not yet available in our data source</p>
-          </div>
+  <RaceResults list={results.sprintQual} isQual />
         ) : (
           <RaceResults list={results.race} />
         )}
