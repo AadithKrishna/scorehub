@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import MotoGPDriverDetail from "./MotoGPDriverDetail";
+import { X } from "lucide-react";
 
 
 const SEASON_UUID = "e88b4e43-2209-47aa-8e83-0e0b1cedde6e";
@@ -622,7 +623,7 @@ function RaceDetail({ event, onClose }) {
           onClick={handleClose}
           className="w-9 h-9 glass-strong rounded-full flex items-center justify-center hover:bg-white/10 flex-shrink-0"
         >
-          <span className="text-white/60 text-xl leading-none">×</span>
+          <X size={16} style={{ color: "var(--text-2)" }} />
         </button>
       </div>
 

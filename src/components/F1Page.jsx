@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import F1DriverDetail from "./F1DriverDetail";
+import { X } from "lucide-react";
 
 
 const JOLPICA = "https://api.jolpi.ca/ergast/f1";
@@ -539,7 +540,7 @@ function RaceDetail({ race, onClose }) {
           onClick={handleClose}
           className="w-9 h-9 glass-strong rounded-full flex items-center justify-center hover:bg-white/10 flex-shrink-0"
         >
-          <span className="text-white/60 text-xl leading-none">×</span>
+          <X size={16} style={{ color: "var(--text-2)" }} />
         </button>
       </div>
 

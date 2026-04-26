@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { X } from "lucide-react";
+
 
 const MGP_PROXY     = "/api/motogp";
 const SEASON_UUID   = "e88b4e43-2209-47aa-8e83-0e0b1cedde6e";
@@ -162,7 +164,7 @@ export default function MotoGPRiderDetail({ rider, onClose }) {
         </div>
         <button onClick={handleClose}
           className="w-9 h-9 glass-strong rounded-full flex items-center justify-center flex-shrink-0">
-          <span className="text-white/60 text-xl leading-none">×</span>
+          <X size={16} style={{ color: "var(--text-2)" }} />
         </button>
       </div>
 
